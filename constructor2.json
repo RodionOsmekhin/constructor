@@ -14,7 +14,8 @@
       "weight": "1.2",
       "coeff": "",
       "sale": "1400",
-      "id": "p1785247997932"
+      "id": "p1785247997932",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKfNX1FhB_vgkxjg0Pz22t_cbljHn-ETJ5Rx8cCTX1kQ&s=10",
@@ -23,7 +24,8 @@
       "weight": "1.340",
       "coeff": "",
       "sale": "1500",
-      "id": "p1785247926424"
+      "id": "p1785247926424",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTp6a7oACrwc__HMVi8IgFVy9XPH4RJdc5DxEfJT1SzBBZvH_wHRyOegnA&s=10",
@@ -32,7 +34,8 @@
       "weight": "2.223",
       "coeff": "",
       "sale": "1600",
-      "id": "p1785247829118"
+      "id": "p1785247829118",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://s.alicdn.com/@sc04/kf/H3df24ad99c014bf7b079cfb6f981c5cbr/13105-Plastic-Educational-Mechanical-Triceratops-Dinosaur-Model-Building-Blocks-Set-800-Pieces-Battery-Powered.png",
@@ -41,7 +44,8 @@
       "weight": "1.846",
       "coeff": "",
       "sale": "1700",
-      "id": "p1785247699478"
+      "id": "p1785247699478",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://www.buildingtoystore.com/17108-superlarge_default/custom-dk-7042-mechanical-lantern-fish-building-blocks-toy-set.jpg",
@@ -50,7 +54,8 @@
       "weight": "1.112",
       "coeff": "",
       "sale": "1500",
-      "id": "p1785247548898"
+      "id": "p1785247548898",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://s.alicdn.com/@sc04/kf/Hdf06953ad48446528786120525b651e5V.jpg_300x300.jpg",
@@ -59,7 +64,8 @@
       "weight": "0.983",
       "coeff": "",
       "sale": "1500",
-      "id": "p1785247299330"
+      "id": "p1785247299330",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRco4WTfnNTgW6NntuCo0lHE5foKsLa48_HPQ3CGMfNcsmt_trbCIZUzXc&s=10",
@@ -68,7 +74,8 @@
       "weight": "0.6",
       "coeff": "",
       "sale": "1200",
-      "id": "p1785247023192"
+      "id": "p1785247023192",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRco4WTfnNTgW6NntuCo0lHE5foKsLa48_HPQ3CGMfNcsmt_trbCIZUzXc&s=10",
@@ -77,7 +84,8 @@
       "weight": "0.6",
       "coeff": "11.3",
       "sale": "1200",
-      "id": "p1784145716876"
+      "id": "p1784145716876",
+      "buyDate": "2026-07-01"
     }
   ]
 }

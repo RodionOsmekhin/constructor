@@ -7,7 +7,6 @@
     "uah": 45
   },
   "items": [
-
     {
       "img": "https://cdn.27.ua/sc--media--prod/default/7d/cb/4f/7dcb4f99-3a04-42fb-b430-2e10d6240e97.png",
       "name": "конструктор велосипед",
@@ -15,7 +14,8 @@
       "weight": "0.057",
       "coeff": "",
       "sale": "200",
-      "id": "p1784145716876"
+      "id": "p1784145716876",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://m.media-amazon.com/images/I/81a8Q3NUR6L._AC_SL1500_.jpg",
@@ -25,7 +25,8 @@
       "coeff": "",
       "sale": "1422",
       "id": "p1784145489243",
-      "sold": true
+      "buyDate": "2026-07-01",
+      "saleDate": "2026-08-05"
     },
     {
       "img": "https://cdn.27.ua/sc--media--prod/default/47/97/f2/4797f2d5-32cc-47f7-abbf-d44a2bc7a213.png",
@@ -34,7 +35,8 @@
       "weight": "1.302",
       "coeff": "",
       "sale": "1400",
-      "id": "p1784145349003"
+      "id": "p1784145349003",
+      "buyDate": "2026-07-01"
     },
     {
       "img": "https://preview.redd.it/anyone-buy-this-wizard-cat-v0-5v1eoyhuczsf1.jpeg?width=1080&crop=smart&auto=webp&s=0e9e087c02e4ee35dd329175f5066af8326b1ff1",
@@ -43,7 +45,8 @@
       "weight": "1.42",
       "coeff": "",
       "sale": "1400",
-      "id": "p1784144770321"
+      "id": "p1784144770321",
+      "buyDate": "2026-07-01"
     }
   ]
 }

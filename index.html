@@ -126,6 +126,17 @@
   .settings-toggle{display:none}
   .mobile-only{display:none}
 
+  .stats-toggle{display:flex;width:100%;justify-content:center;margin:4px 0 12px}
+  .stats-panel{display:none;background:var(--panel);border:1px solid var(--line);
+    border-radius:12px;padding:14px 16px;margin-bottom:16px}
+  .stats-panel.open{display:block}
+  .stats-table{width:100%;border-collapse:collapse;font-size:14px}
+  .stats-table th,.stats-table td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  .stats-table th:first-child,.stats-table td:first-child{text-align:left}
+  .stats-table thead th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+  .stats-table tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--line)}
+  .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
+
   /* мобильные экраны */
   @media (max-width:600px){
     .wrap{padding:0 14px}
@@ -188,6 +199,15 @@
         <button class="btn btn-ghost" style="width:100%" onclick="loadPreset('constructor1.json')">🧱 Конструктор 1</button>
         <button class="btn btn-ghost" style="width:100%" onclick="loadPreset('constructor2.json')">🧱 Конструктор 2</button>
       </div>
+    </div>
+    <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
+    <div class="stats-panel" id="statsPanel">
+      <table class="stats-table">
+        <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Прибыль</th></tr></thead>
+        <tbody id="statsBody"></tbody>
+        <tfoot id="statsFoot"></tfoot>
+      </table>
+      <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
     </div>
   </div>
 </header>
@@ -254,6 +274,16 @@
           <div class="hint">в гривнах ₴</div>
         </div>
       </div>
+      <div class="field2">
+        <div class="field">
+          <label>Дата покупки (необяз.)</label>
+          <input id="f-buydate" type="date">
+        </div>
+        <div class="field">
+          <label>Дата продажи (необяз.)</label>
+          <input id="f-saledate" type="date">
+        </div>
+      </div>
       <div class="field">
         <label>Комментарий (необязательно)</label>
         <textarea id="f-comment" placeholder="Любые заметки к товару..."></textarea>
@@ -314,6 +344,7 @@ const fmt=(n,c)=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:c===' ₴'
 // браузерах/вебвью (не понимают суффикс формата после "@"). При ошибке загрузки
 // пробуем ту же ссылку без "@webp", и только потом показываем плейсхолдер.
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function fmtDate(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}.${m}.${y}`;}
 function imgFallback(img,onFail){
   if(!img.dataset.retried && /@\w+$/.test(img.src)){
     img.dataset.retried='1';
@@ -334,15 +365,17 @@ function render(){
     tWeight+=parseFloat(p.weight)||0;tShip+=c.shipUAH;tItem+=c.itemUAH;
     if(c.buyUAH>0){mSum+=c.margin;mN++;}
     const pc=c.profit>=0?'pos':'neg';
-    const card=document.createElement('div');card.className='card'+(p.sold?' sold':'');
+    const isSold=!!p.saleDate;
+    const card=document.createElement('div');card.className='card'+(isSold?' sold':'');
     card.innerHTML=`
-      <div class="thumb">${p.sold?'<div class="sold-badge">ПРОДАНО</div>':''}${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
+      <div class="thumb">${isSold?'<div class="sold-badge">ПРОДАНО</div>':''}${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
         <div class="noimg" style="display:${p.img?'none':'flex'}">нет фото</div></div>
       <div class="body">
         <h3>${p.name||'Без названия'}</h3>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
           <div class="r"><span>Вес · доставка</span><b>${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}</b></div>
+          ${(p.buyDate||p.saleDate)?`<div class="r"><span>Купл. · продано</span><b>${fmtDate(p.buyDate)||'—'} · ${fmtDate(p.saleDate)||'—'}</b></div>`:''}
         </div>
         <div class="price-block">
           <div class="buy-uah">${fmt(c.buyUAH,' ₴')}</div>
@@ -374,11 +407,12 @@ function render(){
   pf.textContent=fmt(tProfit,' ₴');pf.style.color=tProfit>=0?'var(--green)':'var(--red)';
   document.getElementById('t-profit-usd').textContent=toUsd(tProfit);
   document.getElementById('t-margin').textContent=(tBuy>0?tProfit/tBuy*100:0).toFixed(0)+' %';
+  renderStats();
 }
 
 // modal
 function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
-  ['f-img','f-name','f-item','f-weight','f-coeff','f-sale','f-comment'].forEach(i=>document.getElementById(i).value='');
+  ['f-img','f-name','f-item','f-weight','f-coeff','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('modal-title').textContent='Изменить товар';
@@ -388,6 +422,8 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-weight').value=p.weight||'';
   document.getElementById('f-coeff').value=p.coeff||'';
   document.getElementById('f-sale').value=p.sale||'';
+  document.getElementById('f-buydate').value=p.buyDate||'';
+  document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -414,6 +450,8 @@ function saveProduct(){
     weight:document.getElementById('f-weight').value,
     coeff:document.getElementById('f-coeff').value,
     sale:document.getElementById('f-sale').value,
+    buyDate:document.getElementById('f-buydate').value,
+    saleDate:document.getElementById('f-saledate').value,
     comment:document.getElementById('f-comment').value.trim()};
   if(editId){const i=items.findIndex(x=>x.id===editId);items[i]={...items[i],...p};}
   else{p.id='p'+Date.now();items.unshift(p);}
@@ -502,6 +540,35 @@ document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==
 function toggleSettings(){
   const s=document.getElementById('settings'), open=s.classList.toggle('open');
   document.getElementById('settings-toggle').textContent='⚙ Расчетные данные '+(open?'▴':'▾');
+}
+
+function toggleStats(){
+  const s=document.getElementById('statsPanel'), open=s.classList.toggle('open');
+  document.getElementById('stats-toggle').textContent='📊 Статистика '+(open?'▴':'▾');
+}
+const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
+function renderStats(){
+  const spend={},income={};
+  items.forEach(p=>{
+    const c=compute(p);
+    if(p.buyDate){const k=p.buyDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;}
+    if(p.saleDate){const k=p.saleDate.slice(0,7);income[k]=(income[k]||0)+c.saleUAH;}
+  });
+  const months=Array.from(new Set([...Object.keys(spend),...Object.keys(income)])).sort();
+  const body=document.getElementById('statsBody'), foot=document.getElementById('statsFoot');
+  document.getElementById('statsEmpty').style.display=months.length?'none':'block';
+  let tSpend=0,tIncome=0;
+  body.innerHTML=months.map(k=>{
+    const sp=spend[k]||0, inc=income[k]||0, pr=inc-sp;
+    tSpend+=sp;tIncome+=inc;
+    const pc=pr>=0?'pos':'neg';
+    return`<tr><td>${monthLabel(k)}</td><td>${fmt(sp,' ₴')}</td><td>${fmt(inc,' ₴')}</td>
+      <td class="${pc}">${fmt(pr,' ₴')}</td></tr>`;
+  }).join('');
+  const tp=tIncome-tSpend, tpc=tp>=0?'pos':'neg';
+  foot.innerHTML=months.length?`<tr><td>Итого</td><td>${fmt(tSpend,' ₴')}</td><td>${fmt(tIncome,' ₴')}</td>
+    <td class="${tpc}">${fmt(tp,' ₴')}</td></tr>`:'';
 }
 
 loadSettings();loadItems();render();

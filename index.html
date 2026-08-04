@@ -354,7 +354,6 @@ function render(){
         ${p.comment?`<div class="comment">${escapeHtml(p.comment)}</div>`:''}
       </div>
       <div class="actions">
-        <button class="btn btn-ghost btn-sm" onclick="toggleSold('${p.id}')">${p.sold?'↺ Снять «продано»':'✓ Продано'}</button>
         <button class="btn btn-ghost btn-sm" onclick="editItem('${p.id}')">Изменить</button>
         <button class="btn btn-ghost btn-sm" onclick="delItem('${p.id}')">Удалить</button>
       </div>`;
@@ -421,7 +420,6 @@ function saveProduct(){
   persist();render();closeModal();
 }
 function delItem(id){if(confirm('Удалить товар?')){items=items.filter(x=>x.id!==id);persist();render();}}
-function toggleSold(id){const p=items.find(x=>x.id===id);if(!p)return;p.sold=!p.sold;persist();render();}
 // --- сохранение напрямую в папку (File System Access API) ---
 let dirHandle=null;
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('constructor_db',1);

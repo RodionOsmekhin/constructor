@@ -54,6 +54,10 @@
   .card .thumb img{width:100%;height:100%;object-fit:cover;display:block}
   .card .thumb .noimg{position:absolute;inset:0;display:flex;align-items:center;
     justify-content:center;color:var(--muted);font-size:13px}
+  .card.sold .thumb{filter:grayscale(.6);opacity:.6}
+  .sold-badge{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;
+    font-size:12px;font-weight:800;letter-spacing:.5px;padding:4px 10px;border-radius:6px;
+    box-shadow:var(--shadow);z-index:2;transform:rotate(-6deg)}
   .card .body{padding:14px;display:flex;flex-direction:column;gap:10px;flex:1}
   .card h3{margin:0;font-size:16px;font-weight:700}
   .rows{font-size:13px;color:var(--muted);display:flex;flex-direction:column;gap:3px}
@@ -330,9 +334,9 @@ function render(){
     tWeight+=parseFloat(p.weight)||0;tShip+=c.shipUAH;tItem+=c.itemUAH;
     if(c.buyUAH>0){mSum+=c.margin;mN++;}
     const pc=c.profit>=0?'pos':'neg';
-    const card=document.createElement('div');card.className='card';
+    const card=document.createElement('div');card.className='card'+(p.sold?' sold':'');
     card.innerHTML=`
-      <div class="thumb">${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
+      <div class="thumb">${p.sold?'<div class="sold-badge">ПРОДАНО</div>':''}${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
         <div class="noimg" style="display:${p.img?'none':'flex'}">нет фото</div></div>
       <div class="body">
         <h3>${p.name||'Без названия'}</h3>
@@ -350,6 +354,7 @@ function render(){
         ${p.comment?`<div class="comment">${escapeHtml(p.comment)}</div>`:''}
       </div>
       <div class="actions">
+        <button class="btn btn-ghost btn-sm" onclick="toggleSold('${p.id}')">${p.sold?'↺ Снять «продано»':'✓ Продано'}</button>
         <button class="btn btn-ghost btn-sm" onclick="editItem('${p.id}')">Изменить</button>
         <button class="btn btn-ghost btn-sm" onclick="delItem('${p.id}')">Удалить</button>
       </div>`;
@@ -416,6 +421,7 @@ function saveProduct(){
   persist();render();closeModal();
 }
 function delItem(id){if(confirm('Удалить товар?')){items=items.filter(x=>x.id!==id);persist();render();}}
+function toggleSold(id){const p=items.find(x=>x.id===id);if(!p)return;p.sold=!p.sold;persist();render();}
 // --- сохранение напрямую в папку (File System Access API) ---
 let dirHandle=null;
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('constructor_db',1);

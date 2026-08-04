@@ -1,0 +1,128 @@
+{
+	"saved_at": "28.07.2026, 17:23:21",
+	"saved_iso": "2026-07-28T14:23:21.124Z",
+	"settings": {
+		"coeff": 6.4,
+		"cny": 6.7,
+		"uah": 45.25
+	},
+	"items": [
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №1 море",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "6.4",
+			"sale": "900",
+			"id": "p1785248304468"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №2 море",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "6.4",
+			"sale": "900",
+			"id": "p1735248404468"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №3 море",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "6.4",
+			"sale": "900",
+			"id": "p1285248404468"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №4 море",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "6.4",
+			"sale": "900",
+			"id": "p1785248494468"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №1",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "900",
+			"id": "p1785248404468"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №2",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "900",
+			"id": "p1785248404469"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №3",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "900",
+			"id": "p1785248404410"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "рандом №4",
+			"item": "42.87",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "900",
+			"id": "p1785248404411"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "Гриффиндор",
+			"item": "57",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "1000",
+			"id": "p1785248404412"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "Слизерин",
+			"item": "57",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "1000",
+			"id": "p1785248404413"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "Черная метка",
+			"item": "57",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "1000",
+			"id": "p1785248404414"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "Сова",
+			"item": "47",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "1000",
+			"id": "p1785248404415"
+		},
+		{
+			"img": "https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp",
+			"name": "Хаффлпаф",
+			"item": "47",
+			"weight": "0.2",
+			"coeff": "17.2",
+			"sale": "1000",
+			"id": "p1785248404416"
+		}
+	]
+}

@@ -1,0 +1,92 @@
+{
+  "saved_at": "15.07.2026, 23:49:53",
+  "saved_iso": "2026-07-15T20:49:53.903Z",
+  "settings": {
+    "coeff": 7.534,
+    "cny": 6.562,
+    "uah": 45
+  },
+  "items": [
+    {
+      "img": "",
+      "name": "водяная помпа",
+      "item": "23.9",
+      "weight": "0.35",
+      "coeff": "",
+      "sale": "",
+      "id": "p1784145870868"
+    },
+    {
+      "img": "",
+      "name": "полотенца",
+      "item": "10.8",
+      "weight": "0.083",
+      "coeff": "",
+      "sale": "",
+      "id": "p1784145850451"
+    },
+    {
+      "img": "",
+      "name": "триопсы",
+      "item": "35",
+      "weight": "0.02",
+      "coeff": "",
+      "sale": "",
+      "id": "p1784145820464"
+    },
+    {
+      "img": "",
+      "name": "аквафильтр",
+      "item": "14.85",
+      "weight": "0.203",
+      "coeff": "",
+      "sale": "",
+      "id": "p1784145775337"
+    },
+    {
+      "img": "https://cdn.27.ua/sc--media--prod/default/7d/cb/4f/7dcb4f99-3a04-42fb-b430-2e10d6240e97.png",
+      "name": "конструктор велосипед",
+      "item": "3.8",
+      "weight": "0.057",
+      "coeff": "",
+      "sale": "200",
+      "id": "p1784145716876"
+    },
+    {
+      "img": "",
+      "name": "штатив",
+      "item": "14",
+      "weight": "0.272",
+      "coeff": "",
+      "sale": "",
+      "id": "p1784145675680"
+    },
+    {
+      "img": "https://m.media-amazon.com/images/I/81a8Q3NUR6L._AC_SL1500_.jpg",
+      "name": "конструктор пиранья",
+      "item": "67",
+      "weight": "1.471",
+      "coeff": "",
+      "sale": "1400",
+      "id": "p1784145489243"
+    },
+    {
+      "img": "https://cdn.27.ua/sc--media--prod/default/47/97/f2/4797f2d5-32cc-47f7-abbf-d44a2bc7a213.png",
+      "name": "конструктор кит",
+      "item": "70",
+      "weight": "1.302",
+      "coeff": "",
+      "sale": "1400",
+      "id": "p1784145349003"
+    },
+    {
+      "img": "https://preview.redd.it/anyone-buy-this-wizard-cat-v0-5v1eoyhuczsf1.jpeg?width=1080&crop=smart&auto=webp&s=0e9e087c02e4ee35dd329175f5066af8326b1ff1",
+      "name": "конструктор кот",
+      "item": "82",
+      "weight": "1.42",
+      "coeff": "",
+      "sale": "1400",
+      "id": "p1784144770321"
+    }
+  ]
+}

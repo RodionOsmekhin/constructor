@@ -1,0 +1,83 @@
+{
+  "saved_at": "28.07.2026, 17:15:03",
+  "saved_iso": "2026-07-28T14:15:03.260Z",
+  "settings": {
+    "coeff": 6.4,
+    "cny": 6.67,
+    "uah": 45.25
+  },
+  "items": [
+    {
+      "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSkY2_gFJEToLdp3TrfoTq1JSJ1FHOMlj0QuOcdbrTn6A&s",
+      "name": "Синий Дракон",
+      "item": "72.07",
+      "weight": "1.2",
+      "coeff": "",
+      "sale": "1400",
+      "id": "p1785247997932"
+    },
+    {
+      "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQKfNX1FhB_vgkxjg0Pz22t_cbljHn-ETJ5Rx8cCTX1kQ&s=10",
+      "name": "Кит с электомотором",
+      "item": "72.7",
+      "weight": "1.340",
+      "coeff": "",
+      "sale": "1500",
+      "id": "p1785247926424"
+    },
+    {
+      "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTp6a7oACrwc__HMVi8IgFVy9XPH4RJdc5DxEfJT1SzBBZvH_wHRyOegnA&s=10",
+      "name": "Кот черный",
+      "item": "81.34",
+      "weight": "2.223",
+      "coeff": "",
+      "sale": "1600",
+      "id": "p1785247829118"
+    },
+    {
+      "img": "https://s.alicdn.com/@sc04/kf/H3df24ad99c014bf7b079cfb6f981c5cbr/13105-Plastic-Educational-Mechanical-Triceratops-Dinosaur-Model-Building-Blocks-Set-800-Pieces-Battery-Powered.png",
+      "name": "Динозавр с элетромотором",
+      "item": "97.21",
+      "weight": "1.846",
+      "coeff": "",
+      "sale": "1700",
+      "id": "p1785247699478"
+    },
+    {
+      "img": "https://www.buildingtoystore.com/17108-superlarge_default/custom-dk-7042-mechanical-lantern-fish-building-blocks-toy-set.jpg",
+      "name": "Синяя рыба-фонарь",
+      "item": "55.31",
+      "weight": "1.112",
+      "coeff": "",
+      "sale": "1500",
+      "id": "p1785247548898"
+    },
+    {
+      "img": "https://s.alicdn.com/@sc04/kf/Hdf06953ad48446528786120525b651e5V.jpg_300x300.jpg",
+      "name": "Чорная рыба",
+      "item": "70.35",
+      "weight": "0.983",
+      "coeff": "",
+      "sale": "1500",
+      "id": "p1785247299330"
+    },
+    {
+      "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRco4WTfnNTgW6NntuCo0lHE5foKsLa48_HPQ3CGMfNcsmt_trbCIZUzXc&s=10",
+      "name": "Беззубик #2",
+      "item": "47.2",
+      "weight": "0.6",
+      "coeff": "",
+      "sale": "1200",
+      "id": "p1785247023192"
+    },
+    {
+      "img": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRco4WTfnNTgW6NntuCo0lHE5foKsLa48_HPQ3CGMfNcsmt_trbCIZUzXc&s=10",
+      "name": "Беззубик #1",
+      "item": "43.5",
+      "weight": "0.6",
+      "coeff": "11.3",
+      "sale": "1200",
+      "id": "p1784145716876"
+    }
+  ]
+}

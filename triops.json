@@ -1,0 +1,40 @@
+{
+  "saved_at": "31.07.2026, 23:49:53",
+  "saved_iso": "2026-07-31T20:49:53.903Z",
+  "settings": {
+    "coeff": 0,
+    "cny": 0,
+    "uah": 0
+  },
+  "items": [
+
+    {
+      "img": "",
+      "name": "#1 - Triops cancriformis",
+      "item": "6346",
+      "weight": "0",
+      "coeff": "",
+      "sale": "161",
+      "id": "p1784145716876",
+      "comment" :"test"
+    },
+    {
+      "img": "",
+      "name": "#1 - Triops cancriformis",
+      "item": "0",
+      "weight": "0",
+      "coeff": "",
+      "sale": "161",
+      "id": "p1784145716876"
+    },
+    {
+      "img": "",
+      "name": "#1 - Triops cancriformis",
+      "item": "0",
+      "weight": "0",
+      "coeff": "",
+      "sale": "161",
+      "id": "p1784145716876"
+    }
+  ]
+}

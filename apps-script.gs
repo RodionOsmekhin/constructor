@@ -43,8 +43,24 @@ function getSheet(name, headerRow) {
   if (!sh) {
     sh = ss.insertSheet(name);
     sh.appendRow(headerRow);
+    // весь лист как текст — иначе Таблицы сами превращают даты/числа в
+    // типизированные значения, и при следующем чтении получаем "мусор"
+    sh.getRange(1, 1, sh.getMaxRows(), headerRow.length).setNumberFormat('@');
   }
   return sh;
+}
+
+// Значение из ячейки может оказаться реальным объектом Date (если Таблица
+// сама распознала текст как дату) — тогда String(value) даёт что-то вроде
+// "Wed Jul 01 2026 00:00:00 GMT+0300 (...)" вместо "2026-07-01". Приводим
+// такие значения обратно к простой строке "yyyy-MM-dd".
+function cellToString(value) {
+  if (value === undefined || value === null || value === '') return '';
+  if (value instanceof Date) {
+    const tz = SpreadsheetApp.getActiveSpreadsheet().getSpreadsheetTimeZone();
+    return Utilities.formatDate(value, tz, 'yyyy-MM-dd');
+  }
+  return String(value);
 }
 
 function readAll() {
@@ -54,9 +70,7 @@ function readAll() {
     .filter(r => r.some(c => c !== '' && c !== null))
     .map(r => {
       const o = {};
-      ITEM_FIELDS.forEach((f, i) => {
-        o[f] = (r[i] === undefined || r[i] === null) ? '' : String(r[i]);
-      });
+      ITEM_FIELDS.forEach((f, i) => { o[f] = cellToString(r[i]); });
       return o;
     });
 
@@ -65,7 +79,7 @@ function readAll() {
   let settings = {coeff: 6.4, cny: 6.8, uah: 45};
   if (setRows.length > 1) {
     settings = {};
-    SETTINGS_FIELDS.forEach((f, i) => { settings[f] = setRows[1][i]; });
+    SETTINGS_FIELDS.forEach((f, i) => { settings[f] = cellToString(setRows[1][i]); });
   }
   return {items: items, settings: settings};
 }
@@ -73,17 +87,18 @@ function readAll() {
 function writeAll(data) {
   const itemsSh = getSheet(ITEMS_SHEET, ITEM_FIELDS);
   itemsSh.clearContents();
+  itemsSh.getRange(1, 1, itemsSh.getMaxRows(), ITEM_FIELDS.length).setNumberFormat('@');
   itemsSh.appendRow(ITEM_FIELDS);
   const items = Array.isArray(data.items) ? data.items : [];
   if (items.length) {
-    const rows = items.map(p =>
-      ITEM_FIELDS.map(f => (p[f] !== undefined && p[f] !== null) ? String(p[f]) : ''));
+    const rows = items.map(p => ITEM_FIELDS.map(f => cellToString(p[f])));
     itemsSh.getRange(2, 1, rows.length, ITEM_FIELDS.length).setValues(rows);
   }
 
   const setSh = getSheet(SETTINGS_SHEET, SETTINGS_FIELDS);
   setSh.clearContents();
+  setSh.getRange(1, 1, setSh.getMaxRows(), SETTINGS_FIELDS.length).setNumberFormat('@');
   setSh.appendRow(SETTINGS_FIELDS);
   const s = data.settings || {};
-  setSh.appendRow(SETTINGS_FIELDS.map(f => (s[f] !== undefined ? s[f] : '')));
+  setSh.appendRow(SETTINGS_FIELDS.map(f => cellToString(s[f])));
 }

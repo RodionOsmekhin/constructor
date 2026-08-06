@@ -404,7 +404,14 @@ const fmt=(n,c)=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:c===' ₴'
 // браузерах/вебвью (не понимают суффикс формата после "@"). При ошибке загрузки
 // пробуем ту же ссылку без "@webp", и только потом показываем плейсхолдер.
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function fmtDate(iso){if(!iso)return'';const[y,m,d]=iso.split('-');return`${d}.${m}.${y}`;}
+function fmtDate(iso){
+  if(!iso)return'';
+  const m1=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso);           // "2026-07-01" или "2026-07-01T00:00:00..."
+  if(m1)return`${m1[3]}.${m1[2]}.${m1[1]}`;
+  const d=new Date(iso);                                    // запасной разбор (например, если из таблицы
+  if(!isNaN(d))return`${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; // пришла дата в другом виде)
+  return'';                                                   // не смогли разобрать — лучше пусто, чем "undefined"
+}
 function imgFallback(img,onFail){
   if(!img.dataset.retried && /@\w+$/.test(img.src)){
     img.dataset.retried='1';

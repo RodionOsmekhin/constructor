@@ -126,6 +126,12 @@
   .settings-toggle{display:none}
   .mobile-only{display:none}
 
+  .sync-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 0 2px}
+  .sync-status{font-size:12px;color:var(--muted)}
+  .sync-status.saved{color:var(--green)}
+  .sync-status.error{color:var(--red)}
+  .sync-status.offline{color:var(--gold)}
+
   .stats-toggle{display:flex;width:100%;justify-content:center;margin:4px 0 12px}
   .stats-panel{display:none;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;padding:14px 16px;margin-bottom:16px}
@@ -171,6 +177,10 @@
   <div class="wrap">
     <div class="topbar">
       <div class="brand">📦 Учёт товаров <span>· закупка / продажа</span></div>
+    </div>
+    <div class="sync-bar">
+      <span class="sync-status" id="syncStatus"></span>
+      <button class="btn btn-ghost btn-sm" onclick="loadFromSheet()">🔄 Обновить</button>
     </div>
     <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
     <div class="settings" id="settings">
@@ -307,6 +317,55 @@
 const LS_ITEMS='constructor_items', LS_SET='constructor_settings';
 let items=[], editId=null;
 
+// --- Google Таблица как общее хранилище ---
+// Вставьте сюда URL веб-приложения Google Apps Script (заканчивается на /exec).
+// См. GOOGLE_SHEETS_SETUP.md и apps-script.gs в этом проекте.
+const SHEET_API_URL='https://script.google.com/macros/s/AKfycbzHtlqypTrlGKYKTMoHyhIQPT_tcNWLhDI3NyKJPo4JmykX_cNYuYWi0LsQS0SdccY/exec';
+
+function setSyncStatus(state){
+  const el=document.getElementById('syncStatus');if(!el)return;
+  const map={saving:'🔄 Сохранение…',saved:'✅ Сохранено в таблице',
+    error:'⚠ Не удалось синхронизировать',offline:'📴 Локальный режим (таблица не подключена)'};
+  el.textContent=map[state]||'';
+  el.className='sync-status '+state;
+}
+let syncTimer=null;
+function scheduleSync(){
+  if(!SHEET_API_URL){setSyncStatus('offline');return;}
+  clearTimeout(syncTimer);
+  setSyncStatus('saving');
+  syncTimer=setTimeout(syncToSheet,600);
+}
+async function syncToSheet(){
+  if(!SHEET_API_URL)return;
+  try{
+    const resp=await fetch(SHEET_API_URL,{method:'POST',
+      headers:{'Content-Type':'text/plain;charset=utf-8'},
+      body:JSON.stringify({items,settings:settings()})});
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    setSyncStatus('saved');
+  }catch(err){setSyncStatus('error');console.error('Ошибка синхронизации с таблицей:',err);}
+}
+async function loadFromSheet(){
+  if(!SHEET_API_URL){setSyncStatus('offline');return false;}
+  setSyncStatus('saving');
+  try{
+    const resp=await fetch(SHEET_API_URL);
+    if(!resp.ok)throw new Error('HTTP '+resp.status);
+    const data=await resp.json();
+    if(Array.isArray(data.items))items=data.items;
+    if(data.settings){const s=data.settings;
+      document.getElementById('s-coeff').value=s.coeff;
+      document.getElementById('s-cny').value=s.cny;
+      document.getElementById('s-uah').value=s.uah;
+      localStorage.setItem(LS_SET,JSON.stringify(s));}
+    persistLocal();render();
+    setSyncStatus('saved');
+    return true;
+  }catch(err){setSyncStatus('error');console.error('Ошибка загрузки таблицы:',err);return false;}
+}
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadFromSheet();});
+
 function loadSettings(){
   const s=JSON.parse(localStorage.getItem(LS_SET)||'null');
   if(s){document.getElementById('s-coeff').value=s.coeff;
@@ -317,12 +376,13 @@ function settings(){return{
   coeff:parseFloat(document.getElementById('s-coeff').value)||0,
   cny:parseFloat(document.getElementById('s-cny').value)||1,
   uah:parseFloat(document.getElementById('s-uah').value)||1};}
-function saveSettings(){localStorage.setItem(LS_SET,JSON.stringify(settings()));render();}
+function saveSettings(){localStorage.setItem(LS_SET,JSON.stringify(settings()));scheduleSync();render();}
 ['s-coeff','s-cny','s-uah'].forEach(id=>
   document.getElementById(id).addEventListener('input',saveSettings));
 
 function loadItems(){items=JSON.parse(localStorage.getItem(LS_ITEMS)||'[]');}
-function persist(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
+function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
+function persist(){persistLocal();scheduleSync();}
 
 // core calculation
 function compute(p){
@@ -507,12 +567,12 @@ function importData(e){
   reader.onload=ev=>{
     try{
       const data=JSON.parse(ev.target.result);
-      if(data.items){items=data.items;persist();}
       if(data.settings){const s=data.settings;
         document.getElementById('s-coeff').value=s.coeff;
         document.getElementById('s-cny').value=s.cny;
         document.getElementById('s-uah').value=s.uah;
         localStorage.setItem(LS_SET,JSON.stringify(s));}
+      if(data.items){items=data.items;persist();}
       render();
       alert('Загружено товаров: '+(data.items?data.items.length:0));
     }catch(err){alert('Не удалось прочитать файл: '+err.message);}
@@ -525,12 +585,12 @@ async function loadPreset(file){
     const resp=await fetch(file);
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
-    if(data.items){items=data.items;persist();}
     if(data.settings){const s=data.settings;
       document.getElementById('s-coeff').value=s.coeff;
       document.getElementById('s-cny').value=s.cny;
       document.getElementById('s-uah').value=s.uah;
       localStorage.setItem(LS_SET,JSON.stringify(s));}
+    if(data.items){items=data.items;persist();}
     render();
     alert('Загружено товаров: '+(data.items?data.items.length:0)+' («'+file+'»)');
   }catch(err){alert('Не удалось открыть '+file+': '+err.message+'\nЕсли страница открыта напрямую из файла (file://), запустите её через локальный сервер.');}
@@ -572,6 +632,7 @@ function renderStats(){
 }
 
 loadSettings();loadItems();render();
+loadFromSheet();
 </script>
 </body>
 </html>

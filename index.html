@@ -329,25 +329,45 @@ function setSyncStatus(state){
   el.textContent=map[state]||'';
   el.className='sync-status '+state;
 }
-let syncTimer=null;
+// syncTimer   — таймер отложенной отправки (используется только для настроек,
+//               которые меняются на каждое нажатие клавиши)
+// syncInFlight — промис текущего запроса POST к таблице, если он уже отправляется
+let syncTimer=null, syncInFlight=null;
+
 function scheduleSync(){
+  // для непрерывного ввода (курсы/коэффициент) — короткая задержка, чтобы не
+  // слать запрос на каждый символ
   if(!SHEET_API_URL){setSyncStatus('offline');return;}
   clearTimeout(syncTimer);
   setSyncStatus('saving');
-  syncTimer=setTimeout(syncToSheet,600);
+  syncTimer=setTimeout(()=>{syncTimer=null;syncToSheet();},600);
 }
-async function syncToSheet(){
-  if(!SHEET_API_URL)return;
-  try{
-    const resp=await fetch(SHEET_API_URL,{method:'POST',
+
+function syncToSheet(){
+  if(!SHEET_API_URL)return Promise.resolve();
+  setSyncStatus('saving');
+  const p=fetch(SHEET_API_URL,{method:'POST',keepalive:true,
       headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({items,settings:settings()})});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    setSyncStatus('saved');
-  }catch(err){setSyncStatus('error');console.error('Ошибка синхронизации с таблицей:',err);}
+      body:JSON.stringify({items,settings:settings()})})
+    .then(resp=>{if(!resp.ok)throw new Error('HTTP '+resp.status);setSyncStatus('saved');})
+    .catch(err=>{setSyncStatus('error');console.error('Ошибка синхронизации с таблицей:',err);})
+    .finally(()=>{if(syncInFlight===p)syncInFlight=null;});
+  syncInFlight=p;
+  return p;
 }
+
+// перед тем как перезаписать локальные товары данными из таблицы, обязательно
+// дожидаемся отправки ещё не сохранённых изменений — иначе свежий GET может
+// прийти раньше отложенного POST и «откатить» только что сделанную правку
+// (именно так плашка «продано» пропадала после возврата на вкладку)
+async function flushPendingSync(){
+  if(syncTimer){clearTimeout(syncTimer);syncTimer=null;await syncToSheet();}
+  else if(syncInFlight){await syncInFlight;}
+}
+
 async function loadFromSheet(){
   if(!SHEET_API_URL){setSyncStatus('offline');return false;}
+  await flushPendingSync();
   setSyncStatus('saving');
   try{
     const resp=await fetch(SHEET_API_URL);
@@ -382,7 +402,9 @@ function saveSettings(){localStorage.setItem(LS_SET,JSON.stringify(settings()));
 
 function loadItems(){items=JSON.parse(localStorage.getItem(LS_ITEMS)||'[]');}
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
-function persist(){persistLocal();scheduleSync();}
+// добавление/редактирование/удаление товара — явное разовое действие
+// пользователя, поэтому отправляем в таблицу сразу, без задержки
+function persist(){persistLocal();syncToSheet();}
 
 // core calculation
 function compute(p){

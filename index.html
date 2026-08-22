@@ -373,7 +373,7 @@ async function loadFromSheet(){
     const resp=await fetch(SHEET_API_URL);
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
-    if(Array.isArray(data.items))items=data.items;
+    if(Array.isArray(data.items))items=normalizeItemDates(data.items);
     if(data.settings){const s=data.settings;
       document.getElementById('s-coeff').value=s.coeff;
       document.getElementById('s-cny').value=s.cny;
@@ -400,7 +400,7 @@ function saveSettings(){localStorage.setItem(LS_SET,JSON.stringify(settings()));
 ['s-coeff','s-cny','s-uah'].forEach(id=>
   document.getElementById(id).addEventListener('input',saveSettings));
 
-function loadItems(){items=JSON.parse(localStorage.getItem(LS_ITEMS)||'[]');}
+function loadItems(){items=normalizeItemDates(JSON.parse(localStorage.getItem(LS_ITEMS)||'[]'));}
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
 // добавление/редактирование/удаление товара — явное разовое действие
 // пользователя, поэтому отправляем в таблицу сразу, без задержки
@@ -426,13 +426,29 @@ const fmt=(n,c)=>new Intl.NumberFormat('ru-RU',{maximumFractionDigits:c===' ₴'
 // браузерах/вебвью (не понимают суффикс формата после "@"). При ошибке загрузки
 // пробуем ту же ссылку без "@webp", и только потом показываем плейсхолдер.
 function escapeHtml(s){return s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Приводит дату к чистому "yyyy-MM-dd" вне зависимости от того, что реально
+// прислала таблица (может прийти "2026-07-01", "2026-07-01T00:00:00.000Z"
+// или вообще текстовое представление объекта Date вроде
+// "Wed Jul 01 2026 00:00:00 GMT+0300 (...)"). Используется как единая точка
+// очистки данных сразу при загрузке — дальше по всему приложению (карточка,
+// модалка редактирования, статистика) даты уже гарантированно чистые.
+function normalizeDate(v){
+  if(!v)return'';
+  const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(v);
+  if(m)return`${m[1]}-${m[2]}-${m[3]}`;
+  const d=new Date(v);
+  if(!isNaN(d))return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  return'';
+}
 function fmtDate(iso){
-  if(!iso)return'';
-  const m1=/^(\d{4})-(\d{2})-(\d{2})/.exec(iso);           // "2026-07-01" или "2026-07-01T00:00:00..."
-  if(m1)return`${m1[3]}.${m1[2]}.${m1[1]}`;
-  const d=new Date(iso);                                    // запасной разбор (например, если из таблицы
-  if(!isNaN(d))return`${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; // пришла дата в другом виде)
-  return'';                                                   // не смогли разобрать — лучше пусто, чем "undefined"
+  const n=normalizeDate(iso);
+  if(!n)return'';
+  const[y,m,d]=n.split('-');
+  return`${d}.${m}.${y}`;
+}
+function normalizeItemDates(list){
+  (list||[]).forEach(p=>{p.buyDate=normalizeDate(p.buyDate);p.saleDate=normalizeDate(p.saleDate);});
+  return list;
 }
 function imgFallback(img,onFail){
   if(!img.dataset.retried && /@\w+$/.test(img.src)){
@@ -601,7 +617,7 @@ function importData(e){
         document.getElementById('s-cny').value=s.cny;
         document.getElementById('s-uah').value=s.uah;
         localStorage.setItem(LS_SET,JSON.stringify(s));}
-      if(data.items){items=data.items;persist();}
+      if(data.items){items=normalizeItemDates(data.items);persist();}
       render();
       alert('Загружено товаров: '+(data.items?data.items.length:0));
     }catch(err){alert('Не удалось прочитать файл: '+err.message);}
@@ -619,7 +635,7 @@ async function loadPreset(file){
       document.getElementById('s-cny').value=s.cny;
       document.getElementById('s-uah').value=s.uah;
       localStorage.setItem(LS_SET,JSON.stringify(s));}
-    if(data.items){items=data.items;persist();}
+    if(data.items){items=normalizeItemDates(data.items);persist();}
     render();
     alert('Загружено товаров: '+(data.items?data.items.length:0)+' («'+file+'»)');
   }catch(err){alert('Не удалось открыть '+file+': '+err.message+'\nЕсли страница открыта напрямую из файла (file://), запустите её через локальный сервер.');}

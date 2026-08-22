@@ -33,9 +33,10 @@
   .btn-ghost:hover{border-color:var(--accent)}
   .btn-sm{padding:6px 12px;font-size:13px}
 
-  /* settings bar */
-  .settings{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
+  /* settings bar — сворачиваемая панель (и на десктопе, и на мобильном) */
+  .settings{display:none;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));
     gap:12px;padding:14px 0 18px}
+  .settings.open{display:grid}
   .set-card{background:var(--panel);border:1px solid var(--line);
     border-radius:12px;padding:10px 12px}
   .set-card label{display:block;font-size:11px;color:var(--muted);
@@ -123,7 +124,7 @@
   .modal .mfoot .btn{flex:1}
   .close-x{background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer}
 
-  .settings-toggle{display:none}
+  .settings-toggle{display:flex;width:100%;justify-content:center;margin:8px 0 12px}
   .mobile-only{display:none}
 
   .sync-bar{display:flex;align-items:center;justify-content:flex-end;gap:10px;padding:8px 0 2px}
@@ -155,11 +156,6 @@
     .buy-uah{font-size:22px}
     .field2{grid-template-columns:1fr 1fr}
     body{padding-bottom:120px}
-
-    /* сворачиваемая панель курсов */
-    .settings-toggle{display:flex;width:100%;justify-content:center;margin:14px 0 12px}
-    .settings{display:none}
-    .settings.open{display:grid}
 
     /* нижняя панель: сетка в две строки, без прокрутки */
     .footer .wrap{display:grid;grid-template-columns:repeat(4,1fr);
@@ -619,7 +615,6 @@ function importData(e){
         localStorage.setItem(LS_SET,JSON.stringify(s));}
       if(data.items){items=normalizeItemDates(data.items);persist();}
       render();
-      alert('Загружено товаров: '+(data.items?data.items.length:0));
     }catch(err){alert('Не удалось прочитать файл: '+err.message);}
     e.target.value='';
   };
@@ -637,7 +632,6 @@ async function loadPreset(file){
       localStorage.setItem(LS_SET,JSON.stringify(s));}
     if(data.items){items=normalizeItemDates(data.items);persist();}
     render();
-    alert('Загружено товаров: '+(data.items?data.items.length:0)+' («'+file+'»)');
   }catch(err){alert('Не удалось открыть '+file+': '+err.message+'\nЕсли страница открыта напрямую из файла (file://), запустите её через локальный сервер.');}
 }
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
@@ -646,6 +640,7 @@ function toggleSettings(){
   const s=document.getElementById('settings'), open=s.classList.toggle('open');
   document.getElementById('settings-toggle').textContent='⚙ Расчетные данные '+(open?'▴':'▾');
 }
+// панель «Расчётные данные» по умолчанию свёрнута и на десктопе, и на мобильном
 
 function toggleStats(){
   const s=document.getElementById('statsPanel'), open=s.classList.toggle('open');

@@ -325,14 +325,23 @@ function setSyncStatus(state){
   el.textContent=map[state]||'';
   el.className='sync-status '+state;
 }
-// syncTimer   — таймер отложенной отправки (используется только для настроек,
-//               которые меняются на каждое нажатие клавиши)
+// syncTimer    — таймер отложенной отправки (используется только для настроек,
+//                которые меняются на каждое нажатие клавиши)
 // syncInFlight — промис текущего запроса POST к таблице, если он уже отправляется
+// LS_DIRTY     — флаг «есть локальные изменения, ещё не подтверждённые таблицей».
+//                Хранится в localStorage, а не в переменной, потому что переменная
+//                теряется при перезагрузке/выгрузке вкладки, а именно в этот момент
+//                POST-запрос чаще всего и обрывается недошедшим до сервера.
 let syncTimer=null, syncInFlight=null;
+const LS_DIRTY='constructor_dirty';
+function markDirty(){localStorage.setItem(LS_DIRTY,'1');}
+function clearDirty(){localStorage.removeItem(LS_DIRTY);}
+function isDirty(){return localStorage.getItem(LS_DIRTY)==='1';}
 
 function scheduleSync(){
   // для непрерывного ввода (курсы/коэффициент) — короткая задержка, чтобы не
   // слать запрос на каждый символ
+  markDirty();
   if(!SHEET_API_URL){setSyncStatus('offline');return;}
   clearTimeout(syncTimer);
   setSyncStatus('saving');
@@ -345,25 +354,35 @@ function syncToSheet(){
   const p=fetch(SHEET_API_URL,{method:'POST',keepalive:true,
       headers:{'Content-Type':'text/plain;charset=utf-8'},
       body:JSON.stringify({items,settings:settings()})})
-    .then(resp=>{if(!resp.ok)throw new Error('HTTP '+resp.status);setSyncStatus('saved');})
+    .then(resp=>{if(!resp.ok)throw new Error('HTTP '+resp.status);clearDirty();setSyncStatus('saved');})
     .catch(err=>{setSyncStatus('error');console.error('Ошибка синхронизации с таблицей:',err);})
     .finally(()=>{if(syncInFlight===p)syncInFlight=null;});
   syncInFlight=p;
   return p;
 }
 
-// перед тем как перезаписать локальные товары данными из таблицы, обязательно
+// Перед тем как перезаписать локальные товары данными из таблицы, обязательно
 // дожидаемся отправки ещё не сохранённых изменений — иначе свежий GET может
-// прийти раньше отложенного POST и «откатить» только что сделанную правку
-// (именно так плашка «продано» пропадала после возврата на вкладку)
+// прийти раньше POST и «откатить» только что сделанную правку (именно так
+// плашка «продано» пропадала после возврата на вкладку). Флаг isDirty()
+// переживает перезагрузку страницы, поэтому даже если предыдущая попытка
+// отправки оборвалась (вкладку свернули/закрыли до того, как запрос дошёл),
+// при следующем открытии она будет повторена перед любой загрузкой из таблицы.
 async function flushPendingSync(){
   if(syncTimer){clearTimeout(syncTimer);syncTimer=null;await syncToSheet();}
   else if(syncInFlight){await syncInFlight;}
+  else if(isDirty()){await syncToSheet();}
 }
 
 async function loadFromSheet(){
   if(!SHEET_API_URL){setSyncStatus('offline');return false;}
   await flushPendingSync();
+  if(isDirty()){
+    // отправить так и не удалось (нет сети и т.п.) — ни в коем случае не
+    // затираем ещё не сохранённые локальные правки данными из таблицы
+    setSyncStatus('error');
+    return false;
+  }
   setSyncStatus('saving');
   try{
     const resp=await fetch(SHEET_API_URL);
@@ -400,7 +419,7 @@ function loadItems(){items=normalizeItemDates(JSON.parse(localStorage.getItem(LS
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
 // добавление/редактирование/удаление товара — явное разовое действие
 // пользователя, поэтому отправляем в таблицу сразу, без задержки
-function persist(){persistLocal();syncToSheet();}
+function persist(){persistLocal();markDirty();syncToSheet();}
 
 // core calculation
 function compute(p){

@@ -1,7 +1,15 @@
 /**
  * Google Apps Script — общее хранилище для "Учёт товаров".
- * Хранит товары и настройки в этой Google Таблице и отдаёт/принимает их как JSON,
- * чтобы страница на GitHub Pages могла читать и писать данные, общие для всех.
+ * Хранит товары и настройки в этой Google Таблице.
+ *
+ * В отличие от предыдущей версии, каждое изменение (добавление/редактирование/
+ * удаление товара) отправляется на сервер ОТДЕЛЬНЫМ запросом и применяется
+ * точечно — к одной строке по её id, — а не перезаписывает весь лист целиком.
+ * Это устраняет гонки, из-за которых при почти одновременных действиях
+ * (или при возврате на вкладку сразу после сохранения) часть данных могла
+ * "слетать". Дополнительно запись защищена LockService — пока один запрос
+ * пишет в таблицу, остальные ждут своей очереди вместо того, чтобы писать
+ * одновременно и портить данные друг друга.
  *
  * УСТАНОВКА:
  * 1. Откройте sheets.google.com → создайте новую таблицу.
@@ -14,7 +22,9 @@
  * 6. Скопируйте "URL веб-приложения" (заканчивается на /exec).
  * 7. Вставьте этот URL в index.html в константу SHEET_API_URL.
  *
- * Подробности — в файле GOOGLE_SHEETS_SETUP.md рядом с этим файлом.
+ * ВАЖНО: если у вас уже было старое развёртывание — создайте новую версию
+ * существующего развёртывания (Управление развёртываниями → редактировать →
+ * новая версия), тогда URL менять не придётся.
  */
 
 const ITEMS_SHEET = 'items';
@@ -27,9 +37,69 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  const body = JSON.parse((e.postData && e.postData.contents) || '{}');
-  writeAll(body);
-  return jsonOut({ok: true});
+  const lock = LockService.getScriptLock();
+  try {
+    // ждём до 10 секунд, если таблицу прямо сейчас пишет другой запрос
+    lock.waitLock(10000);
+  } catch (err) {
+    return jsonOut({ok: false, error: 'Таблица занята, попробуйте ещё раз'});
+  }
+  try {
+    const payload = JSON.parse((e.postData && e.postData.contents) || '{}');
+
+    if (payload.type === 'settings') {
+      writeSettings(payload.data || {});
+      return jsonOut({ok: true});
+    }
+
+    // payload.type === 'item' (или не указан — для обратной совместимости)
+    const sheet = getSheet(ITEMS_SHEET, ITEM_FIELDS);
+
+    if (payload.action === 'add') {
+      sheet.appendRow(ITEM_FIELDS.map(f => cellVal(payload.data[f])));
+    } else if (payload.action === 'update') {
+      const rowIndex = findRowById(sheet, payload.data.id);
+      if (rowIndex > -1) {
+        sheet.getRange(rowIndex, 1, 1, ITEM_FIELDS.length)
+          .setValues([ITEM_FIELDS.map(f => cellVal(payload.data[f]))]);
+      } else {
+        // такой строки не нашлось (например, рассинхронизация) — добавляем,
+        // чтобы правка точно не потерялась
+        sheet.appendRow(ITEM_FIELDS.map(f => cellVal(payload.data[f])));
+      }
+    } else if (payload.action === 'delete') {
+      const rowIndex = findRowById(sheet, payload.id);
+      if (rowIndex > -1) sheet.deleteRow(rowIndex);
+    } else {
+      return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
+    }
+
+    return jsonOut({ok: true});
+  } catch (err) {
+    return jsonOut({ok: false, error: String(err)});
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function writeSettings(s) {
+  const sh = getSheet(SETTINGS_SHEET, SETTINGS_FIELDS);
+  sh.getRange(2, 1, 1, SETTINGS_FIELDS.length)
+    .setValues([SETTINGS_FIELDS.map(f => cellVal(s[f]))]);
+}
+
+function findRowById(sheet, id) {
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) { // i=1: пропускаем строку заголовков
+    if (String(data[i][0]) === String(id)) {
+      return i + 1; // Таблицы считают строки с 1, строка 1 — заголовок
+    }
+  }
+  return -1;
+}
+
+function cellVal(v) {
+  return (v === undefined || v === null) ? '' : String(v);
 }
 
 function jsonOut(obj) {
@@ -82,23 +152,4 @@ function readAll() {
     SETTINGS_FIELDS.forEach((f, i) => { settings[f] = cellToString(setRows[1][i]); });
   }
   return {items: items, settings: settings};
-}
-
-function writeAll(data) {
-  const itemsSh = getSheet(ITEMS_SHEET, ITEM_FIELDS);
-  itemsSh.clearContents();
-  itemsSh.getRange(1, 1, itemsSh.getMaxRows(), ITEM_FIELDS.length).setNumberFormat('@');
-  itemsSh.appendRow(ITEM_FIELDS);
-  const items = Array.isArray(data.items) ? data.items : [];
-  if (items.length) {
-    const rows = items.map(p => ITEM_FIELDS.map(f => cellToString(p[f])));
-    itemsSh.getRange(2, 1, rows.length, ITEM_FIELDS.length).setValues(rows);
-  }
-
-  const setSh = getSheet(SETTINGS_SHEET, SETTINGS_FIELDS);
-  setSh.clearContents();
-  setSh.getRange(1, 1, setSh.getMaxRows(), SETTINGS_FIELDS.length).setNumberFormat('@');
-  setSh.appendRow(SETTINGS_FIELDS);
-  const s = data.settings || {};
-  setSh.appendRow(SETTINGS_FIELDS.map(f => cellToString(s[f])));
 }

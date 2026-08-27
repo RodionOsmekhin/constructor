@@ -146,6 +146,8 @@
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
   .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
   .stats-chart-wrap canvas{max-height:220px}
+  .stats-section-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
+    font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 
   /* мобильные экраны */
   @media (max-width:600px){
@@ -219,6 +221,17 @@
       <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
       <div class="stats-chart-wrap">
         <canvas id="chartMonthly" height="90"></canvas>
+      </div>
+
+      <div class="stats-section-title">Разбивка по товарам</div>
+      <table class="stats-table">
+        <thead><tr><th>Товар</th><th>Закупка</th><th>Продажа</th><th>Прибыль</th></tr></thead>
+        <tbody id="statsProductsBody"></tbody>
+        <tfoot id="statsProductsFoot"></tfoot>
+      </table>
+      <div class="stats-empty" id="statsProductsEmpty" style="display:none">Пока нет проданных товаров</div>
+      <div class="stats-chart-wrap">
+        <canvas id="chartProducts" height="110"></canvas>
       </div>
     </div>
   </div>
@@ -331,67 +344,29 @@ function setSyncStatus(state){
   el.textContent=map[state]||'';
   el.className='sync-status '+state;
 }
-// syncTimer    — таймер отложенной отправки (используется только для настроек,
-//                которые меняются на каждое нажатие клавиши)
-// syncInFlight — промис текущего запроса POST к таблице, если он уже отправляется
-// LS_DIRTY     — флаг «есть локальные изменения, ещё не подтверждённые таблицей».
-//                Хранится в localStorage, а не в переменной, потому что переменная
-//                теряется при перезагрузке/выгрузке вкладки, а именно в этот момент
-//                POST-запрос чаще всего и обрывается недошедшим до сервера.
-let syncTimer=null, syncInFlight=null;
-const LS_DIRTY='constructor_dirty';
-function markDirty(){localStorage.setItem(LS_DIRTY,'1');}
-function clearDirty(){localStorage.removeItem(LS_DIRTY);}
-function isDirty(){return localStorage.getItem(LS_DIRTY)==='1';}
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 
-function scheduleSync(){
-  // для непрерывного ввода (курсы/коэффициент) — короткая задержка, чтобы не
-  // слать запрос на каждый символ
-  markDirty();
-  if(!SHEET_API_URL){setSyncStatus('offline');return;}
-  clearTimeout(syncTimer);
-  setSyncStatus('saving');
-  syncTimer=setTimeout(()=>{syncTimer=null;syncToSheet();},600);
-}
-
-function syncToSheet(){
-  if(!SHEET_API_URL)return Promise.resolve();
-  setSyncStatus('saving');
-  const p=fetch(SHEET_API_URL,{method:'POST',keepalive:true,
-      headers:{'Content-Type':'text/plain;charset=utf-8'},
-      body:JSON.stringify({items,settings:settings()})})
-    .then(resp=>{if(!resp.ok)throw new Error('HTTP '+resp.status);clearDirty();setSyncStatus('saved');})
-    .catch(err=>{setSyncStatus('error');console.error('Ошибка синхронизации с таблицей:',err);})
-    .finally(()=>{if(syncInFlight===p)syncInFlight=null;});
-  syncInFlight=p;
-  return p;
-}
-
-// Перед тем как перезаписать локальные товары данными из таблицы, обязательно
-// дожидаемся отправки ещё не сохранённых изменений — иначе свежий GET может
-// прийти раньше POST и «откатить» только что сделанную правку (именно так
-// плашка «продано» пропадала после возврата на вкладку). Флаг isDirty()
-// переживает перезагрузку страницы, поэтому даже если предыдущая попытка
-// отправки оборвалась (вкладку свернули/закрыли до того, как запрос дошёл),
-// при следующем открытии она будет повторена перед любой загрузкой из таблицы.
-async function flushPendingSync(){
-  if(syncTimer){clearTimeout(syncTimer);syncTimer=null;await syncToSheet();}
-  else if(syncInFlight){await syncInFlight;}
-  else if(isDirty()){await syncToSheet();}
+// Каждое изменение (добавить/изменить/удалить товар, изменить настройки)
+// отправляется на сервер ОТДЕЛЬНЫМ запросом сразу же и дожидается ответа —
+// без буферизации и перезаписи всего листа целиком. Именно перезапись
+// целиком вперемешку с фоновым обновлением при возврате на вкладку и
+// приводила к тому, что часть данных о продажах "слетала". Экран при этом
+// обновляется оптимистично (сразу), а при ошибке сети — откатывается назад.
+async function apiPost(payload){
+  if(!SHEET_API_URL)return{ok:false,offline:true};
+  const res=await fetch(SHEET_API_URL,{method:'POST',keepalive:true,
+    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+  if(!res.ok)throw new Error('HTTP '+res.status);
+  const data=await res.json();
+  if(!data.ok)throw new Error(data.error||'неизвестная ошибка сервера');
+  return data;
 }
 
 async function loadFromSheet(){
   if(!SHEET_API_URL){setSyncStatus('offline');return false;}
-  await flushPendingSync();
-  if(isDirty()){
-    // отправить так и не удалось (нет сети и т.п.) — ни в коем случае не
-    // затираем ещё не сохранённые локальные правки данными из таблицы
-    setSyncStatus('error');
-    return false;
-  }
   setSyncStatus('saving');
   try{
-    const resp=await fetch(SHEET_API_URL);
+    const resp=await fetch(SHEET_API_URL,{cache:'no-store'});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
     if(Array.isArray(data.items))items=normalizeItemDates(data.items);
@@ -417,15 +392,24 @@ function settings(){return{
   coeff:parseFloat(document.getElementById('s-coeff').value)||0,
   cny:parseFloat(document.getElementById('s-cny').value)||1,
   uah:parseFloat(document.getElementById('s-uah').value)||1};}
-function saveSettings(){localStorage.setItem(LS_SET,JSON.stringify(settings()));scheduleSync();render();}
+let settingsSyncTimer=null;
+function saveSettings(){
+  localStorage.setItem(LS_SET,JSON.stringify(settings()));
+  render();
+  // короткая задержка, чтобы не слать запрос на каждый символ при вводе
+  clearTimeout(settingsSyncTimer);
+  setSyncStatus('saving');
+  settingsSyncTimer=setTimeout(async()=>{
+    settingsSyncTimer=null;
+    try{await apiPost({type:'settings',data:settings()});setSyncStatus('saved');}
+    catch(err){setSyncStatus('error');console.error('Ошибка сохранения настроек:',err);}
+  },600);
+}
 ['s-coeff','s-cny','s-uah'].forEach(id=>
   document.getElementById(id).addEventListener('input',saveSettings));
 
 function loadItems(){items=normalizeItemDates(JSON.parse(localStorage.getItem(LS_ITEMS)||'[]'));}
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
-// добавление/редактирование/удаление товара — явное разовое действие
-// пользователя, поэтому отправляем в таблицу сразу, без задержки
-function persist(){persistLocal();markDirty();syncToSheet();}
 
 // core calculation
 function compute(p){
@@ -569,7 +553,7 @@ function recalc(){
     pe.style.color=c.profit>=0?'var(--green)':'var(--red)';}
   else{pe.textContent='—';pe.style.color='var(--text)';}
 }
-function saveProduct(){
+async function saveProduct(){
   const p={img:document.getElementById('f-img').value.trim(),
     name:document.getElementById('f-name').value.trim(),
     item:document.getElementById('f-item').value,
@@ -579,11 +563,53 @@ function saveProduct(){
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,
     comment:document.getElementById('f-comment').value.trim()};
-  if(editId){const i=items.findIndex(x=>x.id===editId);items[i]={...items[i],...p};}
-  else{p.id='p'+Date.now();items.unshift(p);}
-  persist();render();closeModal();
+  const wasEditing=!!editId;
+  let prevIdx=-1, prevItem=null, rec;
+  if(wasEditing){
+    prevIdx=items.findIndex(x=>x.id===editId);
+    if(prevIdx===-1)return;
+    prevItem={...items[prevIdx]};
+    items[prevIdx]={...items[prevIdx],...p};
+    rec=items[prevIdx];
+  }else{
+    p.id='p'+uid();
+    items.unshift(p);
+    rec=p;
+  }
+  // оптимистично показываем изменения сразу, не дожидаясь ответа сервера
+  persistLocal();render();closeModal();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'item',action:wasEditing?'update':'add',data:rec});
+    setSyncStatus('saved');
+  }catch(err){
+    // не удалось сохранить на сервере — откатываем изменения на экране
+    if(wasEditing){items[prevIdx]=prevItem;}
+    else{items=items.filter(x=>x.id!==rec.id);}
+    persistLocal();render();
+    setSyncStatus('error');
+    alert('Не удалось сохранить товар в таблице: '+err.message+'\nПопробуйте ещё раз.');
+  }
 }
-function delItem(id){if(confirm('Удалить товар?')){items=items.filter(x=>x.id!==id);persist();render();}}
+async function delItem(id){
+  if(!confirm('Удалить товар?'))return;
+  const idx=items.findIndex(x=>x.id===id);
+  if(idx===-1)return;
+  const removed=items[idx];
+  items=items.filter(x=>x.id!==id);
+  persistLocal();render();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'item',action:'delete',id});
+    setSyncStatus('saved');
+  }catch(err){
+    // откатываем удаление обратно на прежнее место
+    items.splice(idx,0,removed);
+    persistLocal();render();
+    setSyncStatus('error');
+    alert('Не удалось удалить товар в таблице: '+err.message+'\nПопробуйте ещё раз.');
+  }
+}
 // --- сохранение напрямую в папку (File System Access API) ---
 let dirHandle=null;
 function idb(){return new Promise((res,rej)=>{const r=indexedDB.open('constructor_db',1);
@@ -630,15 +656,24 @@ async function exportData(){
 function importData(e){
   const file=e.target.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=ev=>{
+  reader.onload=async ev=>{
     try{
       const data=JSON.parse(ev.target.result);
       if(data.settings){const s=data.settings;
         document.getElementById('s-coeff').value=s.coeff;
         document.getElementById('s-cny').value=s.cny;
         document.getElementById('s-uah').value=s.uah;
-        localStorage.setItem(LS_SET,JSON.stringify(s));}
-      if(data.items){items=normalizeItemDates(data.items);persist();}
+        localStorage.setItem(LS_SET,JSON.stringify(s));
+        apiPost({type:'settings',data:s}).catch(err=>console.error('Ошибка сохранения настроек:',err));}
+      if(data.items){
+        const oldItems=items;
+        const newItems=normalizeItemDates(data.items);
+        newItems.forEach(p=>{if(!p.id)p.id='p'+uid();});
+        items=newItems;persistLocal();render();
+        setSyncStatus('saving');
+        try{await syncBulkReplace(oldItems,newItems);setSyncStatus('saved');}
+        catch(err){setSyncStatus('error');console.error('Ошибка синхронизации импорта:',err);}
+      }
       render();
     }catch(err){alert('Не удалось прочитать файл: '+err.message);}
     e.target.value='';
@@ -654,10 +689,35 @@ async function loadPreset(file){
       document.getElementById('s-coeff').value=s.coeff;
       document.getElementById('s-cny').value=s.cny;
       document.getElementById('s-uah').value=s.uah;
-      localStorage.setItem(LS_SET,JSON.stringify(s));}
-    if(data.items){items=normalizeItemDates(data.items);persist();}
+      localStorage.setItem(LS_SET,JSON.stringify(s));
+      apiPost({type:'settings',data:s}).catch(err=>console.error('Ошибка сохранения настроек:',err));}
+    if(data.items){
+      const oldItems=items;
+      const newItems=normalizeItemDates(data.items);
+      newItems.forEach(p=>{if(!p.id)p.id='p'+uid();});
+      items=newItems;persistLocal();render();
+      setSyncStatus('saving');
+      try{await syncBulkReplace(oldItems,newItems);setSyncStatus('saved');}
+      catch(err){setSyncStatus('error');console.error('Ошибка синхронизации пресета:',err);}
+    }
     render();
   }catch(err){alert('Не удалось открыть '+file+': '+err.message+'\nЕсли страница открыта напрямую из файла (file://), запустите её через локальный сервер.');}
+}
+// Заменяет набор товаров в таблице точечными запросами (по одному товару),
+// а не перезаписью листа целиком: удаляет то, чего больше нет в новом
+// наборе, и добавляет/обновляет остальное. Используется при импорте файла
+// и загрузке пресета.
+async function syncBulkReplace(oldItems,newItems){
+  const oldIds=new Set(oldItems.map(x=>x.id));
+  const newIds=new Set(newItems.map(x=>x.id));
+  for(const id of oldIds){
+    if(!newIds.has(id)){try{await apiPost({type:'item',action:'delete',id});}
+      catch(err){console.error('Не удалось удалить товар '+id,err);}}
+  }
+  for(const it of newItems){
+    try{await apiPost({type:'item',action:oldIds.has(it.id)?'update':'add',data:it});}
+    catch(err){console.error('Не удалось сохранить товар '+it.id,err);}
+  }
 }
 document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
 
@@ -673,7 +733,7 @@ function toggleStats(){
 }
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
-let statsChart=null;
+let statsChart=null, statsProductsChart=null;
 function renderStats(){
   const spend={},income={};
   items.forEach(p=>{
@@ -718,6 +778,50 @@ function renderStats(){
       plugins:{legend:{labels:{color:'#e8eaf0'}}},
       scales:{
         x:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}},
+        y:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}}
+      }
+    }
+  });
+
+  // разбивка по товарам — считаем только реально проданные (есть цена продажи)
+  const soldItems=items.filter(p=>(parseFloat(p.sale)||0)>0).map(p=>{
+    const c=compute(p);
+    return{name:p.name||'Без названия',buy:c.buyUAH,sale:c.saleUAH,profit:c.profit};
+  }).sort((a,b)=>b.profit-a.profit);
+
+  const pBody=document.getElementById('statsProductsBody'), pFoot=document.getElementById('statsProductsFoot');
+  document.getElementById('statsProductsEmpty').style.display=soldItems.length?'none':'block';
+  let pBuy=0,pSale=0;
+  pBody.innerHTML=soldItems.map(it=>{
+    pBuy+=it.buy;pSale+=it.sale;
+    const pc=it.profit>=0?'pos':'neg';
+    return`<tr><td>${escapeHtml(it.name)}</td><td>${fmt(it.buy,' ₴')}</td><td>${fmt(it.sale,' ₴')}</td>
+      <td class="${pc}">${fmt(it.profit,' ₴')}</td></tr>`;
+  }).join('');
+  const pProfit=pSale-pBuy, pPc=pProfit>=0?'pos':'neg';
+  pFoot.innerHTML=soldItems.length?`<tr><td>Итого</td><td>${fmt(pBuy,' ₴')}</td><td>${fmt(pSale,' ₴')}</td>
+    <td class="${pPc}">${fmt(pProfit,' ₴')}</td></tr>`:'';
+
+  // график по товарам (топ-10 по прибыли) — по аналогии с месячным графиком
+  const topItems=soldItems.slice(0,10);
+  const pLabels=topItems.length?topItems.map(it=>it.name):['Нет данных'];
+  const pCtx=document.getElementById('chartProducts').getContext('2d');
+  if(statsProductsChart)statsProductsChart.destroy();
+  statsProductsChart=new Chart(pCtx,{
+    type:'bar',
+    data:{
+      labels:pLabels,
+      datasets:[
+        {label:'Закупка',data:topItems.map(it=>it.buy),backgroundColor:'#ff5d6c'},
+        {label:'Продажа',data:topItems.map(it=>it.sale),backgroundColor:'#2fbf71'},
+        {label:'Прибыль',data:topItems.map(it=>it.profit),type:'line',borderColor:'#ffbf47',backgroundColor:'#ffbf47',tension:.3}
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:'#e8eaf0'}}},
+      scales:{
+        x:{ticks:{color:'#8b93a7',maxRotation:40,minRotation:0},grid:{color:'#2a2f3a'}},
         y:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}}
       }
     }

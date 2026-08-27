@@ -9,6 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Товары">
 <title>Учёт товаров — закупка и продажа</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222c; --line:#2a2f3a;
@@ -143,6 +144,8 @@
   .stats-table thead th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .stats-table tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--line)}
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
+  .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
+  .stats-chart-wrap canvas{max-height:220px}
 
   /* мобильные экраны */
   @media (max-width:600px){
@@ -214,6 +217,9 @@
         <tfoot id="statsFoot"></tfoot>
       </table>
       <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
+      <div class="stats-chart-wrap">
+        <canvas id="chartMonthly" height="90"></canvas>
+      </div>
     </div>
   </div>
 </header>
@@ -667,6 +673,7 @@ function toggleStats(){
 }
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
+let statsChart=null;
 function renderStats(){
   const spend={},income={};
   items.forEach(p=>{
@@ -688,6 +695,33 @@ function renderStats(){
   const tp=tIncome-tSpend, tpc=tp>=0?'pos':'neg';
   foot.innerHTML=months.length?`<tr><td>Итого</td><td>${fmt(tSpend,' ₴')}</td><td>${fmt(tIncome,' ₴')}</td>
     <td class="${tpc}">${fmt(tp,' ₴')}</td></tr>`:'';
+
+  // график по месяцам (закупка / продажа / прибыль) — аналогично index2
+  const labels=months.length?months.map(monthLabel):['Нет данных'];
+  const spendData=months.map(k=>spend[k]||0);
+  const incomeData=months.map(k=>income[k]||0);
+  const profitData=months.map(k=>(income[k]||0)-(spend[k]||0));
+  const ctx=document.getElementById('chartMonthly').getContext('2d');
+  if(statsChart)statsChart.destroy();
+  statsChart=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:labels,
+      datasets:[
+        {label:'Траты',data:spendData,backgroundColor:'#ff5d6c'},
+        {label:'Доход',data:incomeData,backgroundColor:'#2fbf71'},
+        {label:'Прибыль',data:profitData,type:'line',borderColor:'#ffbf47',backgroundColor:'#ffbf47',tension:.3}
+      ]
+    },
+    options:{
+      responsive:true,
+      plugins:{legend:{labels:{color:'#e8eaf0'}}},
+      scales:{
+        x:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}},
+        y:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}}
+      }
+    }
+  });
 }
 
 loadSettings();loadItems();render();

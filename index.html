@@ -154,16 +154,40 @@
   .stats-section-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
     font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
 
-  /* мобильные экраны */
+  /* мобильные экраны — одна колонка, компактная горизонтальная карточка
+     (картинка слева небольшим квадратом, суть — справа), чтобы на экране
+     помещалось больше товаров сразу */
   @media (max-width:600px){
     .wrap{padding:0 14px}
     .topbar{display:none}
     .mobile-only{display:flex}
-    .grid{grid-template-columns:1fr 1fr;gap:12px}
-    .card h3{font-size:14px}
-    .card .actions{gap:6px;padding:0 10px 10px}
-    .card .actions .btn{padding:7px 4px;font-size:12px;min-width:0}
-    .buy-uah{font-size:22px}
+    .grid{grid-template-columns:1fr;gap:8px}
+
+    .card{flex-direction:row;border-radius:12px;align-items:stretch}
+    .card .thumb{aspect-ratio:auto;width:78px;height:78px;flex-shrink:0}
+    .card .thumb .noimg{font-size:9px;padding:2px;text-align:center;line-height:1.2}
+    .sold-badge{font-size:8px;padding:2px 5px;top:3px;left:3px;transform:rotate(-6deg) scale(.9)}
+
+    .card .body{padding:8px 10px;gap:4px}
+    .card h3{font-size:12.5px;line-height:1.25;font-weight:700;
+      display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+    .rows{font-size:11.5px;gap:2px}
+    .comment{font-size:11px;padding:6px 8px;margin-top:4px}
+
+    .price-block{margin-top:0;padding-top:0;border-top:none;display:flex;align-items:baseline;
+      justify-content:space-between;flex-wrap:wrap;column-gap:10px;row-gap:2px}
+    .buy-uah{font-size:11px;font-weight:700;display:flex;align-items:baseline;gap:4px}
+    .buy-uah::before{content:'Закупка';font-weight:400;color:var(--muted);font-size:11px}
+    .buy-usd{display:none}
+    .sale-line{margin-top:0;gap:4px}
+    .sale-line .lbl{font-size:11px}
+    .sale-line .val{font-size:11px;font-weight:700}
+    .profit{margin-top:2px;font-size:11px;width:100%}
+
+    .card .actions{flex-direction:column;justify-content:center;
+      padding:6px 6px 6px 0;gap:5px;width:auto}
+    .card .actions .btn{flex:none;padding:5px 9px;font-size:11px;min-width:0;white-space:nowrap}
+
     .field2{grid-template-columns:1fr 1fr}
     body{padding-bottom:120px}
 
@@ -175,7 +199,6 @@
     .stat .v{font-size:14px}
     .stat .usd{font-size:10px}
   }
-  @media (max-width:380px){ .grid{grid-template-columns:1fr} }
 </style>
 </head>
 <body>
@@ -188,56 +211,57 @@
       <span class="sync-status" id="syncStatus"></span>
       <button class="btn btn-ghost btn-sm" onclick="loadFromSheet()">🔄 Обновить</button>
     </div>
-    <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
-    <div class="settings" id="settings">
-      <div class="set-card" style="display:flex;align-items:flex-end">
-        <button class="btn btn-primary" style="width:100%" onclick="openModal()">+ Добавить товар</button>
-      </div>
-      <div class="set-card">
-        <label>Коэффициент доставки</label>
-        <div class="inp"><input id="s-coeff" type="number" step="0.1" value="6.4"><span class="unit">$ / кг</span></div>
-      </div>
-      <div class="set-card">
-        <label>Курс юаня</label>
-        <div class="inp"><input id="s-cny" type="number" step="0.01" value="6.8"><span class="unit">₴ за 1 ¥</span></div>
-      </div>
-      <div class="set-card">
-        <label>Курс гривны</label>
-        <div class="inp"><input id="s-uah" type="number" step="0.1" value="45"><span class="unit">₴ за 1 $</span></div>
-      </div>
-      <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
-        <button class="btn btn-ghost" style="width:100%" onclick="exportData()">⇩ Экспорт данных</button>
-        <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
-        <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
-      </div>
-    </div>
-    <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
-    <div class="stats-panel" id="statsPanel">
-      <table class="stats-table">
-        <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Прибыль</th></tr></thead>
-        <tbody id="statsBody"></tbody>
-        <tfoot id="statsFoot"></tfoot>
-      </table>
-      <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
-      <div class="stats-chart-wrap">
-        <canvas id="chartMonthly" height="90"></canvas>
-      </div>
-
-      <div class="stats-section-title">Разбивка по товарам</div>
-      <table class="stats-table">
-        <thead><tr><th>Товар</th><th>Закупка</th><th>Продажа</th><th>Прибыль</th></tr></thead>
-        <tbody id="statsProductsBody"></tbody>
-        <tfoot id="statsProductsFoot"></tfoot>
-      </table>
-      <div class="stats-empty" id="statsProductsEmpty" style="display:none">Пока нет проданных товаров</div>
-      <div class="stats-chart-wrap">
-        <canvas id="chartProducts" height="110"></canvas>
-      </div>
-    </div>
   </div>
 </header>
 
 <main class="wrap">
+  <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
+  <div class="settings" id="settings">
+    <div class="set-card" style="display:flex;align-items:flex-end">
+      <button class="btn btn-primary" style="width:100%" onclick="openModal()">+ Добавить товар</button>
+    </div>
+    <div class="set-card">
+      <label>Коэффициент доставки</label>
+      <div class="inp"><input id="s-coeff" type="number" step="0.1" value="6.4"><span class="unit">$ / кг</span></div>
+    </div>
+    <div class="set-card">
+      <label>Курс юаня</label>
+      <div class="inp"><input id="s-cny" type="number" step="0.01" value="6.8"><span class="unit">₴ за 1 ¥</span></div>
+    </div>
+    <div class="set-card">
+      <label>Курс гривны</label>
+      <div class="inp"><input id="s-uah" type="number" step="0.1" value="45"><span class="unit">₴ за 1 $</span></div>
+    </div>
+    <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" style="width:100%" onclick="exportData()">⇩ Экспорт данных</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
+      <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
+    </div>
+  </div>
+  <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
+  <div class="stats-panel" id="statsPanel">
+    <table class="stats-table">
+      <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Прибыль</th></tr></thead>
+      <tbody id="statsBody"></tbody>
+      <tfoot id="statsFoot"></tfoot>
+    </table>
+    <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
+    <div class="stats-chart-wrap">
+      <canvas id="chartMonthly" height="90"></canvas>
+    </div>
+
+    <div class="stats-section-title">Разбивка по проданным товарам</div>
+    <table class="stats-table">
+      <thead><tr><th>Товар</th><th>Закупка</th><th>Продажа</th><th>Прибыль</th></tr></thead>
+      <tbody id="statsProductsBody"></tbody>
+      <tfoot id="statsProductsFoot"></tfoot>
+    </table>
+    <div class="stats-empty" id="statsProductsEmpty" style="display:none">Пока нет проданных товаров</div>
+    <div class="stats-chart-wrap">
+      <canvas id="chartProducts" height="110"></canvas>
+    </div>
+  </div>
+
   <div class="cat-tabs" id="catTabs">
     <button class="cat-tab active" data-cat="" onclick="setCategory('')">Все</button>
     <button class="cat-tab" data-cat="clock" onclick="setCategory('clock')">🕒 Часы</button>
@@ -359,7 +383,10 @@ function setCategory(cat){
   render();
 }
 function visibleItems(){
-  return currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
+  const list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
+  // непроданные — сверху, проданные (есть дата продажи) — снизу;
+  // порядок внутри каждой группы не меняется
+  return [...list].sort((a,b)=>(a.saleDate?1:0)-(b.saleDate?1:0));
 }
 
 // --- Google Таблица как общее хранилище (механизм как в triops_uchet) ---
@@ -812,7 +839,7 @@ function renderStats(){
   });
 
   // разбивка по товарам — считаем только реально проданные (есть цена продажи)
-  const soldItems=visibleItems().filter(p=>(parseFloat(p.sale)||0)>0).map(p=>{
+  const soldItems=visibleItems().filter(p=>!!p.saleDate).map(p=>{
     const c=compute(p);
     return{name:p.name||'Без названия',buy:c.buyUAH,sale:c.saleUAH,profit:c.profit};
   }).sort((a,b)=>b.profit-a.profit);

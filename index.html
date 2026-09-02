@@ -332,10 +332,15 @@
 const LS_ITEMS='constructor_items', LS_SET='constructor_settings';
 let items=[], editId=null;
 
-// --- Google Таблица как общее хранилище ---
+// --- Google Таблица как общее хранилище (механизм как в triops_uchet) ---
 // Вставьте сюда URL веб-приложения Google Apps Script (заканчивается на /exec).
+// SHEET_API_KEY должен буква-в-букву совпадать с APP_KEY в apps-script.gs —
+// это простая защита, чтобы посторонний с этой ссылкой не мог читать/писать
+// вашу таблицу. Можно сменить оба значения на любую свою строку.
 // См. GOOGLE_SHEETS_SETUP.md и apps-script.gs в этом проекте.
 const SHEET_API_URL='https://script.google.com/macros/s/AKfycbzHtlqypTrlGKYKTMoHyhIQPT_tcNWLhDI3NyKJPo4JmykX_cNYuYWi0LsQS0SdccY/exec';
+const SHEET_API_KEY='constructor-secret-2026';
+function sheetUrl(){return SHEET_API_URL+'?key='+encodeURIComponent(SHEET_API_KEY);}
 
 function setSyncStatus(state){
   const el=document.getElementById('syncStatus');if(!el)return;
@@ -349,26 +354,32 @@ const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 // Каждое изменение (добавить/изменить/удалить товар, изменить настройки)
 // отправляется на сервер ОТДЕЛЬНЫМ запросом сразу же и дожидается ответа —
 // без буферизации и перезаписи всего листа целиком. Именно перезапись
-// целиком вперемешку с фоновым обновлением при возврате на вкладку и
-// приводила к тому, что часть данных о продажах "слетала". Экран при этом
-// обновляется оптимистично (сразу), а при ошибке сети — откатывается назад.
+// целиком (плюс фоновое обновление при возврате на вкладку) и приводила к
+// тому, что данные периодически обнулялись. Экран при этом обновляется
+// оптимистично (сразу), а при ошибке сети — откатывается назад.
+// Без кастомных заголовков — чтобы браузер не делал CORS preflight-запрос
+// (Apps Script Web App его не обрабатывает).
 async function apiPost(payload){
   if(!SHEET_API_URL)return{ok:false,offline:true};
-  const res=await fetch(SHEET_API_URL,{method:'POST',keepalive:true,
-    headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(payload)});
+  const res=await fetch(sheetUrl(),{method:'POST',keepalive:true,body:JSON.stringify(payload)});
   if(!res.ok)throw new Error('HTTP '+res.status);
   const data=await res.json();
   if(!data.ok)throw new Error(data.error||'неизвестная ошибка сервера');
   return data;
 }
 
+// Как в triops_uchet: данные загружаются из таблицы один раз при открытии
+// страницы (плюс вручную по кнопке «🔄 Обновить»). Никакого автообновления
+// по таймеру или при возврате на вкладку — именно оно было источником гонок
+// с точечными сохранениями и «обнулением» данных.
 async function loadFromSheet(){
   if(!SHEET_API_URL){setSyncStatus('offline');return false;}
   setSyncStatus('saving');
   try{
-    const resp=await fetch(SHEET_API_URL,{cache:'no-store'});
+    const resp=await fetch(sheetUrl(),{cache:'no-store'});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
+    if(!data.ok)throw new Error(data.error||'неизвестная ошибка сервера');
     if(Array.isArray(data.items))items=normalizeItemDates(data.items);
     if(data.settings){const s=data.settings;
       document.getElementById('s-coeff').value=s.coeff;
@@ -378,9 +389,13 @@ async function loadFromSheet(){
     persistLocal();render();
     setSyncStatus('saved');
     return true;
-  }catch(err){setSyncStatus('error');console.error('Ошибка загрузки таблицы:',err);return false;}
+  }catch(err){
+    setSyncStatus('error');
+    console.error('Ошибка загрузки таблицы:',err);
+    alert('Не удалось загрузить данные из таблицы: '+err.message+'\nПроверьте подключение к интернету.');
+    return false;
+  }
 }
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)loadFromSheet();});
 
 function loadSettings(){
   const s=JSON.parse(localStorage.getItem(LS_SET)||'null');
@@ -681,8 +696,21 @@ function importData(e){
   reader.readAsText(file);
 }
 async function loadPreset(file){
+  // это разрушительное действие: оно заменяет ВСЕ товары в общей таблице
+  // (в том числе у других, кто с ней работает) содержимым файла пресета.
+  // То, чего нет в пресете, будет удалено из таблицы. Поэтому всегда
+  // спрашиваем явное подтверждение, прежде чем что-либо менять.
+  if(items.length && !confirm(
+    'Это заменит ВСЕ текущие товары (в общей таблице, для всех) содержимым файла «'+file+'».\n\n'+
+    'Товары, которых нет в этом наборе, будут удалены из таблицы — восстановить их можно '+
+    'только через Файл → Журнал версий в самой Google Таблице.\n\nПродолжить?'
+  )) return;
   try{
-    const resp=await fetch(file);
+    // отключаем кэш браузера: иначе после обновления файла пресета на
+    // сервере страница может по-прежнему подставлять старую закэшированную
+    // версию (именно так после обновления файла кнопка «Часы» продолжала
+    // грузить старые данные)
+    const resp=await fetch(file+(file.includes('?')?'&':'?')+'v='+Date.now(),{cache:'no-store'});
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
     if(data.settings){const s=data.settings;

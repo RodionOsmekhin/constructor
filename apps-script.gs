@@ -15,28 +15,42 @@
  * 1. Откройте sheets.google.com → создайте новую таблицу.
  * 2. Меню Расширения → Apps Script.
  * 3. Удалите всё содержимое файла Code.gs и вставьте туда этот файл целиком.
- * 4. Сохраните (значок дискеты).
- * 5. Развернуть → Новое развёртывание → тип "Веб-приложение":
+ * 4. (Необязательно, но рекомендуется) смените APP_KEY ниже на свою строку —
+ *    и точно такую же впишите в index.html в константу SHEET_API_KEY.
+ * 5. Сохраните (значок дискеты).
+ * 6. Развернуть → Новое развёртывание → тип "Веб-приложение":
  *      Выполнять как: Я
  *      У кого есть доступ: Все
- * 6. Скопируйте "URL веб-приложения" (заканчивается на /exec).
- * 7. Вставьте этот URL в index.html в константу SHEET_API_URL.
+ * 7. Скопируйте "URL веб-приложения" (заканчивается на /exec).
+ * 8. Вставьте этот URL в index.html в константу SHEET_API_URL.
  *
  * ВАЖНО: если у вас уже было старое развёртывание — создайте новую версию
  * существующего развёртывания (Управление развёртываниями → редактировать →
  * новая версия), тогда URL менять не придётся.
  */
 
+// Смените на любую свою строку — и здесь, и в index.html в константе
+// SHEET_API_KEY (значения должны совпадать буква в букву). Это простая защита
+// от посторонних, которые случайно узнают ссылку /exec.
+const APP_KEY = 'constructor-secret-2026';
+
 const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
 const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
 
+function checkKey(e) {
+  const key = (e.parameter && e.parameter.key) || '';
+  return key === APP_KEY;
+}
+
 function doGet(e) {
+  if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
   return jsonOut(readAll());
 }
 
 function doPost(e) {
+  if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
   const lock = LockService.getScriptLock();
   try {
     // ждём до 10 секунд, если таблицу прямо сейчас пишет другой запрос

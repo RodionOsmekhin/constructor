@@ -153,6 +153,10 @@
   .stats-chart-wrap canvas{max-height:220px}
   .stats-section-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
     font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
+  .stock-table .qty-input{width:64px;text-align:right;background:var(--panel2);
+    border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px;font-size:13px}
+  .stock-table .remain{font-weight:800}
+  .stock-table .remain.zero{color:var(--muted)}
 
   /* мобильные экраны — одна колонка, компактная горизонтальная карточка
      (картинка слева небольшим квадратом, суть — справа), чтобы на экране
@@ -249,6 +253,13 @@
     <div class="stats-chart-wrap">
       <canvas id="chartMonthly" height="90"></canvas>
     </div>
+
+    <div class="stats-section-title">Остатки</div>
+    <table class="stats-table stock-table">
+      <thead><tr><th>Товар</th><th>В наличии</th><th>Продано</th><th>Остаток</th></tr></thead>
+      <tbody id="stockBody"></tbody>
+    </table>
+    <div class="stats-empty" id="stockEmpty" style="display:none">Нет товаров</div>
 
     <div class="stats-section-title">Разбивка по проданным товарам</div>
     <table class="stats-table">
@@ -789,7 +800,49 @@ function toggleStats(){
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
 let statsChart=null, statsProductsChart=null;
+
+// Остаток = «В наличии» (сколько куплено/есть этого товара) минус «Продано»
+// (1, если у товара стоит дата продажи — сейчас на один товар одна продажа).
+// «В наличии» задаётся вручную прямо в этой таблице и сохраняется как поле
+// qty у товара; при простановке/снятии даты продажи остаток пересчитывается
+// сам, так как считается на лету при каждой отрисовке.
+function renderStock(){
+  const tbody=document.getElementById('stockBody');
+  if(!tbody)return;
+  const list=visibleItems();
+  document.getElementById('stockEmpty').style.display=list.length?'none':'block';
+  tbody.innerHTML=list.map(p=>{
+    const qty=(p.qty!==undefined&&p.qty!==''&&!isNaN(parseInt(p.qty,10)))?parseInt(p.qty,10):1;
+    const sold=p.saleDate?1:0;
+    const remain=Math.max(0,qty-sold);
+    return`<tr>
+      <td>${escapeHtml(p.name||'Без названия')}</td>
+      <td><input class="qty-input" type="number" min="0" step="1" value="${qty}"
+        onchange="updateQty('${p.id}',this.value)"></td>
+      <td>${sold}</td>
+      <td class="remain${remain===0?' zero':''}">${remain}</td>
+    </tr>`;
+  }).join('');
+}
+async function updateQty(id,value){
+  const p=items.find(x=>x.id===id);if(!p)return;
+  const prevQty=p.qty;
+  const n=parseInt(value,10);
+  p.qty=isNaN(n)||n<0?0:n;
+  persistLocal();renderStock();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'item',action:'update',data:p});
+    setSyncStatus('saved');
+  }catch(err){
+    p.qty=prevQty;persistLocal();renderStock();
+    setSyncStatus('error');
+    alert('Не удалось сохранить количество в таблице: '+err.message);
+  }
+}
+
 function renderStats(){
+  renderStock();
   const spend={},income={};
   visibleItems().forEach(p=>{
     const c=compute(p);

@@ -36,7 +36,7 @@ const APP_KEY = 'constructor-secret-2026';
 
 const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
-const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category'];
+const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
 
 function checkKey(e) {

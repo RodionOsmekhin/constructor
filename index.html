@@ -256,7 +256,7 @@
 
     <div class="stats-section-title">Остатки</div>
     <table class="stats-table stock-table">
-      <thead><tr><th>Товар</th><th>В наличии</th><th>Продано</th><th>Остаток</th></tr></thead>
+      <thead><tr><th>Товар</th><th>Кол-во</th><th>Продано</th><th>Остаток</th></tr></thead>
       <tbody id="stockBody"></tbody>
     </table>
     <div class="stats-empty" id="stockEmpty" style="display:none">Нет товаров</div>
@@ -801,9 +801,9 @@ const MONTHS=['Январь','Февраль','Март','Апрель','Май'
 function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
 let statsChart=null, statsProductsChart=null;
 
-// Остаток = «В наличии» (сколько куплено/есть этого товара) минус «Продано»
+// Остаток = «Кол-во» (сколько куплено/есть этого товара) минус «Продано»
 // (1, если у товара стоит дата продажи — сейчас на один товар одна продажа).
-// «В наличии» задаётся вручную прямо в этой таблице и сохраняется как поле
+// «Кол-во» задаётся вручную прямо в этой таблице и сохраняется как поле
 // qty у товара; при простановке/снятии даты продажи остаток пересчитывается
 // сам, так как считается на лету при каждой отрисовке.
 function renderStock(){

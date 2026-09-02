@@ -105,7 +105,7 @@
   .modal .mhead h2{margin:0;font-size:18px}
   .modal .mbody{padding:20px;display:flex;flex-direction:column;gap:14px}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
-  .field input,.field textarea{width:100%;background:var(--panel2);border:1px solid var(--line);
+  .field input,.field textarea,.field select{width:100%;background:var(--panel2);border:1px solid var(--line);
     color:var(--text);border-radius:9px;padding:11px 12px;font-size:15px;font-family:inherit}
   .field textarea{resize:vertical;min-height:56px}
   .field .hint{font-size:11px;color:var(--muted);margin-top:4px}
@@ -135,6 +135,11 @@
   .sync-status.offline{color:var(--gold)}
 
   .stats-toggle{display:flex;width:100%;justify-content:center;margin:4px 0 12px}
+
+  .cat-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 16px}
+  .cat-tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);
+    border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
+  .cat-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
   .stats-panel{display:none;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;padding:14px 16px;margin-bottom:16px}
   .stats-panel.open{display:block}
@@ -205,11 +210,6 @@
         <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
         <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
       </div>
-      <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
-        <button class="btn btn-ghost" style="width:100%" onclick="loadPreset('clock.json')">🕒 Часы</button>
-        <button class="btn btn-ghost" style="width:100%" onclick="loadPreset('constructor1.json')">🧱 Конструктор 1</button>
-        <button class="btn btn-ghost" style="width:100%" onclick="loadPreset('constructor2.json')">🧱 Конструктор 2</button>
-      </div>
     </div>
     <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
     <div class="stats-panel" id="statsPanel">
@@ -238,6 +238,12 @@
 </header>
 
 <main class="wrap">
+  <div class="cat-tabs" id="catTabs">
+    <button class="cat-tab active" data-cat="" onclick="setCategory('')">Все</button>
+    <button class="cat-tab" data-cat="clock" onclick="setCategory('clock')">🕒 Часы</button>
+    <button class="cat-tab" data-cat="constructor1" onclick="setCategory('constructor1')">🧱 Конструктор 1</button>
+    <button class="cat-tab" data-cat="constructor2" onclick="setCategory('constructor2')">🧱 Конструктор 2</button>
+  </div>
   <div id="grid" class="grid"></div>
   <div id="empty" class="empty" style="display:none">
     <h2>Пока нет товаров</h2>
@@ -274,6 +280,15 @@
       <div class="field">
         <label>Название</label>
         <input id="f-name" type="text" placeholder="Например: наушники TWS">
+      </div>
+      <div class="field">
+        <label>Категория</label>
+        <select id="f-category">
+          <option value="">Без категории</option>
+          <option value="clock">🕒 Часы</option>
+          <option value="constructor1">🧱 Конструктор 1</option>
+          <option value="constructor2">🧱 Конструктор 2</option>
+        </select>
       </div>
       <div class="field2">
         <div class="field">
@@ -331,6 +346,21 @@
 <script>
 const LS_ITEMS='constructor_items', LS_SET='constructor_settings';
 let items=[], editId=null;
+
+// категория — просто фильтр отображения (как раньше делали кнопки
+// «Часы»/«Конструктор 1»/«Конструктор 2»), а не отдельный набор данных:
+// товары всех категорий лежат в одной общей таблице.
+const LS_CATEGORY='constructor_category';
+let currentCategory=localStorage.getItem(LS_CATEGORY)||'';
+function setCategory(cat){
+  currentCategory=cat;
+  localStorage.setItem(LS_CATEGORY,cat);
+  document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  render();
+}
+function visibleItems(){
+  return currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
+}
 
 // --- Google Таблица как общее хранилище (механизм как в triops_uchet) ---
 // Вставьте сюда URL веб-приложения Google Apps Script (заканчивается на /exec).
@@ -481,10 +511,11 @@ function imgFallback(img,onFail){
 
 function render(){
   const grid=document.getElementById('grid');
-  document.getElementById('empty').style.display=items.length?'none':'block';
+  const list=visibleItems();
+  document.getElementById('empty').style.display=list.length?'none':'block';
   grid.innerHTML='';
   let tBuy=0,tSale=0,tProfit=0,mSum=0,mN=0,tWeight=0,tShip=0,tItem=0;
-  items.forEach(p=>{
+  list.forEach(p=>{
     const c=compute(p);
     tBuy+=c.buyUAH;tSale+=c.saleUAH;tProfit+=c.profit;
     tWeight+=parseFloat(p.weight)||0;tShip+=c.shipUAH;tItem+=c.itemUAH;
@@ -517,7 +548,7 @@ function render(){
       </div>`;
     grid.appendChild(card);
   });
-  document.getElementById('t-count').textContent=items.length;
+  document.getElementById('t-count').textContent=list.length;
   document.getElementById('t-weight').textContent=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(tWeight)+' кг';
   const rate=settings().uah||1, toUsd=v=>fmt(v/rate,' $');
   document.getElementById('t-item').textContent=fmt(tItem,' ₴');
@@ -538,11 +569,15 @@ function render(){
 // modal
 function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
   ['f-img','f-name','f-item','f-weight','f-coeff','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
+  // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
+  // была нажата одна из кнопок «Часы»/«Конструктор 1»/«Конструктор 2»)
+  document.getElementById('f-category').value=currentCategory;
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('modal-title').textContent='Изменить товар';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
+  document.getElementById('f-category').value=p.category||'';
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
   document.getElementById('f-coeff').value=p.coeff||'';
@@ -571,6 +606,7 @@ function recalc(){
 async function saveProduct(){
   const p={img:document.getElementById('f-img').value.trim(),
     name:document.getElementById('f-name').value.trim(),
+    category:document.getElementById('f-category').value,
     item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,
     coeff:document.getElementById('f-coeff').value,
@@ -695,42 +731,6 @@ function importData(e){
   };
   reader.readAsText(file);
 }
-async function loadPreset(file){
-  // это разрушительное действие: оно заменяет ВСЕ товары в общей таблице
-  // (в том числе у других, кто с ней работает) содержимым файла пресета.
-  // То, чего нет в пресете, будет удалено из таблицы. Поэтому всегда
-  // спрашиваем явное подтверждение, прежде чем что-либо менять.
-  if(items.length && !confirm(
-    'Это заменит ВСЕ текущие товары (в общей таблице, для всех) содержимым файла «'+file+'».\n\n'+
-    'Товары, которых нет в этом наборе, будут удалены из таблицы — восстановить их можно '+
-    'только через Файл → Журнал версий в самой Google Таблице.\n\nПродолжить?'
-  )) return;
-  try{
-    // отключаем кэш браузера: иначе после обновления файла пресета на
-    // сервере страница может по-прежнему подставлять старую закэшированную
-    // версию (именно так после обновления файла кнопка «Часы» продолжала
-    // грузить старые данные)
-    const resp=await fetch(file+(file.includes('?')?'&':'?')+'v='+Date.now(),{cache:'no-store'});
-    if(!resp.ok)throw new Error('HTTP '+resp.status);
-    const data=await resp.json();
-    if(data.settings){const s=data.settings;
-      document.getElementById('s-coeff').value=s.coeff;
-      document.getElementById('s-cny').value=s.cny;
-      document.getElementById('s-uah').value=s.uah;
-      localStorage.setItem(LS_SET,JSON.stringify(s));
-      apiPost({type:'settings',data:s}).catch(err=>console.error('Ошибка сохранения настроек:',err));}
-    if(data.items){
-      const oldItems=items;
-      const newItems=normalizeItemDates(data.items);
-      newItems.forEach(p=>{if(!p.id)p.id='p'+uid();});
-      items=newItems;persistLocal();render();
-      setSyncStatus('saving');
-      try{await syncBulkReplace(oldItems,newItems);setSyncStatus('saved');}
-      catch(err){setSyncStatus('error');console.error('Ошибка синхронизации пресета:',err);}
-    }
-    render();
-  }catch(err){alert('Не удалось открыть '+file+': '+err.message+'\nЕсли страница открыта напрямую из файла (file://), запустите её через локальный сервер.');}
-}
 // Заменяет набор товаров в таблице точечными запросами (по одному товару),
 // а не перезаписью листа целиком: удаляет то, чего больше нет в новом
 // наборе, и добавляет/обновляет остальное. Используется при импорте файла
@@ -764,7 +764,7 @@ function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-
 let statsChart=null, statsProductsChart=null;
 function renderStats(){
   const spend={},income={};
-  items.forEach(p=>{
+  visibleItems().forEach(p=>{
     const c=compute(p);
     if(p.buyDate){const k=p.buyDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;}
     if(p.saleDate){const k=p.saleDate.slice(0,7);income[k]=(income[k]||0)+c.saleUAH;}
@@ -812,7 +812,7 @@ function renderStats(){
   });
 
   // разбивка по товарам — считаем только реально проданные (есть цена продажи)
-  const soldItems=items.filter(p=>(parseFloat(p.sale)||0)>0).map(p=>{
+  const soldItems=visibleItems().filter(p=>(parseFloat(p.sale)||0)>0).map(p=>{
     const c=compute(p);
     return{name:p.name||'Без названия',buy:c.buyUAH,sale:c.saleUAH,profit:c.profit};
   }).sort((a,b)=>b.profit-a.profit);
@@ -856,6 +856,7 @@ function renderStats(){
   });
 }
 
+document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===currentCategory));
 loadSettings();loadItems();render();
 loadFromSheet();
 </script>

@@ -36,7 +36,7 @@ const APP_KEY = 'constructor-secret-2026';
 
 const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
-const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment'];
+const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
 
 function checkKey(e) {
@@ -46,7 +46,8 @@ function checkKey(e) {
 
 function doGet(e) {
   if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
-  return jsonOut(readAll());
+  const data = readAll();
+  return jsonOut({ok: true, items: data.items, settings: data.settings});
 }
 
 function doPost(e) {

@@ -197,11 +197,11 @@
 
     /* нижняя панель: сетка в две строки, без прокрутки */
     .footer .wrap{display:grid;grid-template-columns:repeat(4,1fr);
-      gap:10px 8px;padding:10px 14px;overflow:visible}
+      gap:6px 6px;padding:6px 10px;overflow:visible}
     .stat{min-width:0}
-    .stat .k{font-size:9px}
-    .stat .v{font-size:14px}
-    .stat .usd{font-size:10px}
+    .stat .k{font-size:7.5px}
+    .stat .v{font-size:11.5px}
+    .stat .usd{font-size:8.5px}
   }
 </style>
 </head>
@@ -602,7 +602,22 @@ function render(){
   document.getElementById('t-profit-usd').textContent=toUsd(tProfit);
   document.getElementById('t-margin').textContent=(tBuy>0?tProfit/tBuy*100:0).toFixed(0)+' %';
   renderStats();
+  syncFooterPadding();
 }
+
+// нижняя панель-итог (.footer) фиксирована по низу экрана — если контент
+// в ней переносится на 2 строки (особенно на маленьких/узких телефонах),
+// её реальная высота может отличаться от захардкоженного отступа в CSS,
+// и последняя карточка товара оказывается под ней. Подгоняем отступ снизу
+// под фактическую высоту панели каждый раз, когда список товаров меняется
+// или окно меняет размер/ориентацию.
+function syncFooterPadding(){
+  const footer=document.querySelector('.footer');
+  if(!footer)return;
+  document.body.style.paddingBottom=(footer.offsetHeight+16)+'px';
+}
+window.addEventListener('resize',syncFooterPadding);
+window.addEventListener('orientationchange',()=>setTimeout(syncFooterPadding,150));
 
 // modal
 function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
@@ -806,24 +821,43 @@ let statsChart=null, statsProductsChart=null;
 // «Кол-во» задаётся вручную прямо в этой таблице и сохраняется как поле
 // qty у товара; при простановке/снятии даты продажи остаток пересчитывается
 // сам, так как считается на лету при каждой отрисовке.
+// товары вида "рандом №1", "рандом №2", "Беззубик #1" и т.п. — это по сути
+// один и тот же товар (просто разные проданные штуки одной позиции), поэтому
+// в статистике их объединяем в одну строку. Убираем только сам номер
+// "№N"/"#N", а остальной текст названия (например, "море"/"торт") оставляем —
+// так "рандом №1 море" и "рандом №2 море" объединятся между собой, но не с
+// "рандом №3 торт" или просто "рандом", т.к. это разные товары.
+function groupKey(name){
+  const cleaned=(name||'').replace(/\s*[№#]\s*\d+\s*/g,' ').replace(/\s+/g,' ').trim();
+  return cleaned||'Без названия';
+}
 function renderStock(){
   const tbody=document.getElementById('stockBody');
   if(!tbody)return;
   const list=visibleItems();
   document.getElementById('stockEmpty').style.display=list.length?'none':'block';
-  tbody.innerHTML=list.map(p=>{
+  const groups={};
+  list.forEach(p=>{
+    const key=groupKey(p.name);
     const qty=(p.qty!==undefined&&p.qty!==''&&!isNaN(parseInt(p.qty,10)))?parseInt(p.qty,10):1;
-    const sold=p.saleDate?1:0;
-    const remain=Math.max(0,qty-sold);
+    if(!groups[key])groups[key]={name:key,ids:[],qty:0,sold:0};
+    groups[key].ids.push(p.id);
+    groups[key].qty+=qty;
+    if(p.saleDate)groups[key].sold++;
+  });
+  const rows=Object.values(groups).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  tbody.innerHTML=rows.map(g=>{
+    const remain=Math.max(0,g.qty-g.sold);
     return`<tr>
-      <td>${escapeHtml(p.name||'Без названия')}</td>
-      <td><input class="qty-input" type="number" min="0" step="1" value="${qty}"
-        onchange="updateQty('${p.id}',this.value)"></td>
-      <td>${sold}</td>
+      <td>${escapeHtml(g.name)}</td>
+      <td><input class="qty-input" type="number" min="0" step="1" value="${g.qty}"
+        onchange="updateGroupQty('${g.ids.join(',')}',this.value)"></td>
+      <td>${g.sold}</td>
       <td class="remain${remain===0?' zero':''}">${remain}</td>
     </tr>`;
   }).join('');
 }
+// один товар (без объединения) — остаётся как раньше
 async function updateQty(id,value){
   const p=items.find(x=>x.id===id);if(!p)return;
   const prevQty=p.qty;
@@ -836,6 +870,27 @@ async function updateQty(id,value){
     setSyncStatus('saved');
   }catch(err){
     p.qty=prevQty;persistLocal();renderStock();
+    setSyncStatus('error');
+    alert('Не удалось сохранить количество в таблице: '+err.message);
+  }
+}
+// несколько товаров, объединённых в одну строку (например, три штуки
+// "рандом") — введённое общее количество записываем в первый товар группы,
+// у остальных обнуляем, чтобы сумма по группе совпадала с введённым числом.
+async function updateGroupQty(idsStr,value){
+  const ids=idsStr.split(',');
+  const n=parseInt(value,10);
+  const total=isNaN(n)||n<0?0:n;
+  const changed=ids.map(id=>{const p=items.find(x=>x.id===id);return{p,prevQty:p?p.qty:undefined};}).filter(c=>c.p);
+  changed.forEach((c,i)=>{c.p.qty=i===0?total:0;});
+  persistLocal();renderStock();
+  setSyncStatus('saving');
+  try{
+    for(const c of changed){await apiPost({type:'item',action:'update',data:c.p});}
+    setSyncStatus('saved');
+  }catch(err){
+    changed.forEach(c=>{c.p.qty=c.prevQty;});
+    persistLocal();renderStock();
     setSyncStatus('error');
     alert('Не удалось сохранить количество в таблице: '+err.message);
   }
@@ -891,11 +946,15 @@ function renderStats(){
     }
   });
 
-  // разбивка по товарам — считаем только реально проданные (есть цена продажи)
-  const soldItems=visibleItems().filter(p=>!!p.saleDate).map(p=>{
-    const c=compute(p);
-    return{name:p.name||'Без названия',buy:c.buyUAH,sale:c.saleUAH,profit:c.profit};
-  }).sort((a,b)=>b.profit-a.profit);
+  // разбивка по товарам — считаем только реально проданные (есть цена продажи),
+  // сгруппированные по groupKey (см. определение выше)
+  const groups={};
+  visibleItems().filter(p=>!!p.saleDate).forEach(p=>{
+    const c=compute(p), key=groupKey(p.name);
+    if(!groups[key])groups[key]={name:key,buy:0,sale:0,profit:0,qty:0};
+    groups[key].buy+=c.buyUAH;groups[key].sale+=c.saleUAH;groups[key].profit+=c.profit;groups[key].qty++;
+  });
+  const soldItems=Object.values(groups).sort((a,b)=>b.profit-a.profit);
 
   const pBody=document.getElementById('statsProductsBody'), pFoot=document.getElementById('statsProductsFoot');
   document.getElementById('statsProductsEmpty').style.display=soldItems.length?'none':'block';
@@ -903,7 +962,8 @@ function renderStats(){
   pBody.innerHTML=soldItems.map(it=>{
     pBuy+=it.buy;pSale+=it.sale;
     const pc=it.profit>=0?'pos':'neg';
-    return`<tr><td>${escapeHtml(it.name)}</td><td>${fmt(it.buy,' ₴')}</td><td>${fmt(it.sale,' ₴')}</td>
+    const label=it.qty>1?`${it.name} ×${it.qty}`:it.name;
+    return`<tr><td>${escapeHtml(label)}</td><td>${fmt(it.buy,' ₴')}</td><td>${fmt(it.sale,' ₴')}</td>
       <td class="${pc}">${fmt(it.profit,' ₴')}</td></tr>`;
   }).join('');
   const pProfit=pSale-pBuy, pPc=pProfit>=0?'pos':'neg';
@@ -912,7 +972,7 @@ function renderStats(){
 
   // график по товарам (топ-10 по прибыли) — по аналогии с месячным графиком
   const topItems=soldItems.slice(0,10);
-  const pLabels=topItems.length?topItems.map(it=>it.name):['Нет данных'];
+  const pLabels=topItems.length?topItems.map(it=>it.qty>1?`${it.name} ×${it.qty}`:it.name):['Нет данных'];
   const pCtx=document.getElementById('chartProducts').getContext('2d');
   if(statsProductsChart)statsProductsChart.destroy();
   statsProductsChart=new Chart(pCtx,{

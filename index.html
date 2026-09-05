@@ -144,19 +144,32 @@
     border-radius:12px;padding:14px 16px;margin-bottom:16px}
   .stats-panel.open{display:block}
   .stats-table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
-  .stats-table th,.stats-table td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);
+  .stats-table th,.stats-table td{padding:8px 10px;text-align:center;border-bottom:1px solid var(--line);
     overflow-wrap:break-word;word-break:break-word}
   .stats-table th:first-child,.stats-table td:first-child{text-align:left}
   .stats-table thead th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .stats-table tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--line)}
+
+  /* разные цвета для разных колонок — легче отличить траты/доход,
+     закупку/продажу и т.п. с первого взгляда */
+  #statsBody td:nth-child(2),#statsFoot td:nth-child(2){color:var(--red)}
+  #statsBody td:nth-child(3),#statsFoot td:nth-child(3){color:var(--green)}
+  #statsProductsBody td:nth-child(2),#statsProductsFoot td:nth-child(2){color:var(--red)}
+  #statsProductsBody td:nth-child(3),#statsProductsFoot td:nth-child(3){color:var(--green)}
+  #stockBody td:nth-child(3){color:var(--gold)}
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
   .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
   .stats-chart-wrap canvas{max-height:220px}
   .stats-section-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
     font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
-  .stock-table .qty-input{width:64px;text-align:right;background:var(--panel2);
-    border:1px solid var(--line);color:var(--text);border-radius:6px;padding:5px 6px;font-size:13px}
-  .stock-table .remain{font-weight:800}
+  .stock-table .qty-input{width:64px;display:block;margin:0 auto;text-align:center;background:var(--panel2);
+    border:1px solid var(--line);color:var(--accent);border-radius:6px;padding:5px 6px;font-size:13px;
+    -moz-appearance:textfield}
+  /* прячем стрелочки +/- у числового поля — из-за них цифра визуально
+     съезжала влево от центра поля */
+  .stock-table .qty-input::-webkit-inner-spin-button,
+  .stock-table .qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .stock-table .remain{font-weight:800;color:var(--green)}
   .stock-table .remain.zero{color:var(--muted)}
 
   /* мобильные экраны — одна колонка, компактная горизонтальная карточка
@@ -198,7 +211,7 @@
 
     .stats-table{font-size:11px}
     .stats-table th,.stats-table td{padding:5px 3px}
-    .stock-table .qty-input{width:36px;padding:3px 2px;font-size:11px}
+    .stock-table .qty-input{width:36px;padding:3px 2px;font-size:11px;text-align:center}
 
     /* нижняя панель: сетка в две строки, без прокрутки */
     .footer .wrap{display:grid;grid-template-columns:repeat(4,1fr);

@@ -143,8 +143,9 @@
   .stats-panel{display:none;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;padding:14px 16px;margin-bottom:16px}
   .stats-panel.open{display:block}
-  .stats-table{width:100%;border-collapse:collapse;font-size:14px}
-  .stats-table th,.stats-table td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line)}
+  .stats-table{width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed}
+  .stats-table th,.stats-table td{padding:8px 10px;text-align:right;border-bottom:1px solid var(--line);
+    overflow-wrap:break-word;word-break:break-word}
   .stats-table th:first-child,.stats-table td:first-child{text-align:left}
   .stats-table thead th{color:var(--muted);font-size:12px;text-transform:uppercase;letter-spacing:.5px;font-weight:600}
   .stats-table tfoot td{font-weight:800;border-bottom:none;border-top:2px solid var(--line)}
@@ -194,6 +195,10 @@
 
     .field2{grid-template-columns:1fr 1fr}
     body{padding-bottom:120px}
+
+    .stats-table{font-size:11px}
+    .stats-table th,.stats-table td{padding:5px 3px}
+    .stock-table .qty-input{width:36px;padding:3px 2px;font-size:11px}
 
     /* нижняя панель: сетка в две строки, без прокрутки */
     .footer .wrap{display:grid;grid-template-columns:repeat(4,1fr);

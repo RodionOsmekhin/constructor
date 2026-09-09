@@ -343,11 +343,13 @@
       </div>
       <div class="field">
         <label>Название</label>
-        <input id="f-name" type="text" placeholder="Например: наушники TWS">
+        <select id="f-name-select" style="display:none" onchange="onNameSelect()"></select>
+        <input id="f-name" type="text" placeholder="Например: часы Miniso">
+        <div class="hint" id="f-name-hint" style="display:none">Выберите товар из списка выше — название и фото подставятся сами. Список можно открыть повторно и выбрать другой товар в любой момент.</div>
       </div>
       <div class="field">
         <label>Категория</label>
-        <select id="f-category">
+        <select id="f-category" onchange="updateNameSuggestions()">
           <option value="">Без категории</option>
           <option value="clock">🕒 Часы</option>
           <option value="constructor1">🧱 Конструктор 1</option>
@@ -662,6 +664,7 @@ function openModal(){editId=null;document.getElementById('modal-title').textCont
   // была нажата одна из кнопок «Часы»/«Конструктор 1»/«Конструктор 2»)
   document.getElementById('f-category').value=currentCategory;
   document.getElementById('f-shipmethod').value='sea';
+  updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('modal-title').textContent='Изменить товар';
@@ -676,8 +679,61 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-buydate').value=p.buyDate||'';
   document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
+  updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
+
+// известные названия товаров категории "Часы" (собраны из уже добавленных
+// товаров) — при выборе категории «Часы» они предлагаются как список для
+// поля «Название», а при выборе точного названия из списка автоматически
+// подставляется ссылка на фото этого товара.
+const CLOCK_NAMES=[
+  {name:'рандом',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
+  {name:'рандом море',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
+  {name:'рандом авиа',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
+  {name:'рандом12',img:'https://content2.rozetka.com.ua/goods/images/big/680233314.jpg',emoji:'🎁'},
+  {name:'Гриффиндор',img:'https://content.rozetka.com.ua/goods/images/big/680233319.jpg',emoji:'🦁'},
+  {name:'Хаффлпаф',img:'https://content2.rozetka.com.ua/goods/images/big/680233321.jpg',emoji:'🦡'},
+  {name:'Слизерин',img:'https://content2.rozetka.com.ua/goods/images/big/680233324.jpg',emoji:'🐍'},
+  {name:'Рэйвенкло',img:'https://content.rozetka.com.ua/goods/images/big/680233323.jpg',emoji:'🦅'},
+  {name:'Торт',img:'https://content1.rozetka.com.ua/goods/images/big/680233320.jpg',emoji:'🎂'},
+  {name:'Сладкое королевство',img:'https://content2.rozetka.com.ua/goods/images/big/680233327.jpg',emoji:'🍬'},
+  {name:'Министерство Магии',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823pj-mpc68nh0rochf1',emoji:'🏛️'},
+  {name:'Патронус',img:'https://content.rozetka.com.ua/goods/images/big/680233325.jpg',emoji:'🐺'},
+  {name:'9¾',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823r0-mop707vf7egxc2',emoji:'🚂'},
+  {name:'Сова',img:'https://content.rozetka.com.ua/goods/images/big/680233322.jpg',emoji:'🦉'},
+  {name:'Черная метка',img:'https://content.rozetka.com.ua/goods/images/big/680233326.jpg',emoji:'☠️'},
+  {name:'Дары смерти',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'△'},
+  {name:'Карта мародеров',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'🗺️'},
+  {name:'Снитч',img:'https://ae-pic-a1.aliexpress-media.com/kf/S84f07e85bc09488f836a5b732ede22705.jpg_640x640.jpg',emoji:'🏅'},
+  {name:'Ночное крыло',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/4.webp',emoji:'🌑🐉'},
+  {name:'Кодекс викингов',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/6.webp',emoji:'⚔️'},
+  {name:'беззубик',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/2.webp',emoji:'🐲'}
+];
+// список для быстрого выбора товара категории «Часы» — обычный select
+// (а не datalist), чтобы он открывался как надо на любом устройстве и его
+// можно было открывать и выбирать заново сколько угодно раз.
+function updateNameSuggestions(){
+  const sel=document.getElementById('f-name-select');
+  const isClock=document.getElementById('f-category').value==='clock';
+  if(isClock){
+    sel.innerHTML='<option value="">— выбрать товар —</option>'+
+      CLOCK_NAMES.map(c=>`<option value="${escapeHtml(c.name)}">${c.emoji?c.emoji+' ':''}${escapeHtml(c.name)}</option>`).join('');
+    // если текущее название совпадает с одним из известных — сразу отмечаем его в списке
+    const cur=document.getElementById('f-name').value;
+    sel.value=CLOCK_NAMES.some(c=>c.name===cur)?cur:'';
+  }
+  sel.style.display=isClock?'block':'none';
+  document.getElementById('f-name-hint').style.display=isClock?'block':'none';
+}
+function onNameSelect(){
+  const sel=document.getElementById('f-name-select');
+  const match=CLOCK_NAMES.find(c=>c.name===sel.value);
+  if(!match)return;
+  document.getElementById('f-name').value=match.name;
+  if(match.img)document.getElementById('f-img').value=match.img;
+  updatePreview();recalc();
+}
 function updatePreview(){const u=document.getElementById('f-img').value;const pv=document.getElementById('preview');
   pv.innerHTML=u?`<img src="${u}" onerror="imgFallback(this,el=>{el.parentElement.innerHTML='<span>ссылка не открылась</span>'})">`:'<span>Предпросмотр фото</span>';}
 function recalc(){

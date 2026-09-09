@@ -286,6 +286,7 @@
         <th class="sortable" onclick="setStockSort('remain')"><span class="th-label">Остаток<span class="sort-arrow" id="sortArrow-remain"></span></span></th>
       </tr></thead>
       <tbody id="stockBody"></tbody>
+      <tfoot id="stockFoot"></tfoot>
     </table>
     <div class="stats-empty" id="stockEmpty" style="display:none">Нет товаров</div>
 
@@ -351,6 +352,13 @@
           <option value="clock">🕒 Часы</option>
           <option value="constructor1">🧱 Конструктор 1</option>
           <option value="constructor2">🧱 Конструктор 2</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Способ доставки</label>
+        <select id="f-shipmethod">
+          <option value="sea">🚢 Море</option>
+          <option value="air">✈️ Авиа</option>
         </select>
       </div>
       <div class="field2">
@@ -596,7 +604,7 @@ function render(){
         <h3>${p.name||'Без названия'}</h3>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
-          <div class="r"><span>Вес · доставка</span><b>${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}</b></div>
+          <div class="r"><span>Вес · доставка ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}</b></div>
           ${(p.buyDate||p.saleDate)?`<div class="r"><span>Купл. · продано</span><b>${fmtDate(p.buyDate)||'—'} · ${fmtDate(p.saleDate)||'—'}</b></div>`:''}
         </div>
         <div class="price-block">
@@ -653,12 +661,14 @@ function openModal(){editId=null;document.getElementById('modal-title').textCont
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
   // была нажата одна из кнопок «Часы»/«Конструктор 1»/«Конструктор 2»)
   document.getElementById('f-category').value=currentCategory;
+  document.getElementById('f-shipmethod').value='sea';
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('modal-title').textContent='Изменить товар';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-category').value=p.category||'';
+  document.getElementById('f-shipmethod').value=p.shipMethod||'sea';
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
   document.getElementById('f-coeff').value=p.coeff||'';
@@ -688,6 +698,7 @@ async function saveProduct(){
   const p={img:document.getElementById('f-img').value.trim(),
     name:document.getElementById('f-name').value.trim(),
     category:document.getElementById('f-category').value,
+    shipMethod:document.getElementById('f-shipmethod').value,
     item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,
     coeff:document.getElementById('f-coeff').value,
@@ -907,6 +918,13 @@ function renderStock(){
       <td class="remain${remain===0?' zero':''}">${remain}</td>
     </tr>`;
   }).join('');
+  const stockFoot=document.getElementById('stockFoot');
+  if(stockFoot){
+    const tQty=rows.reduce((s,g)=>s+g.qty,0), tSold=rows.reduce((s,g)=>s+g.sold,0),
+      tRemain=rows.reduce((s,g)=>s+g.remain,0);
+    stockFoot.innerHTML=rows.length?`<tr><td>Итого</td><td>${tQty}</td><td>${tSold}</td>
+      <td class="remain${tRemain===0?' zero':''}">${tRemain}</td></tr>`:'';
+  }
 }
 // один товар (без объединения) — остаётся как раньше
 async function updateQty(id,value){

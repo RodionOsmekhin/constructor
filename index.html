@@ -387,6 +387,11 @@
           <div class="hint">в гривнах ₴</div>
         </div>
       </div>
+      <div class="field">
+        <label>Доставка напрямую в гривнах (необязательно)</label>
+        <input id="f-shipmanual" type="number" step="1" placeholder="0" oninput="recalc()">
+        <div class="hint">если указано — вес и коэффициент доставки не используются, доставка = это число</div>
+      </div>
       <div class="field2">
         <div class="field">
           <label>Дата покупки (необяз.)</label>
@@ -537,8 +542,11 @@ function compute(p){
   const s=settings();
   const coeff=(p.coeff!=null&&p.coeff!=='')?parseFloat(p.coeff):s.coeff;
   const itemUAH=(parseFloat(p.item)||0)*s.cny;      // ¥ → ₴ напрямую
-  const shipUSD=(parseFloat(p.weight)||0)*coeff;    // вес × коэф. в $
-  const shipUAH=shipUSD*s.uah;                       // доставка $ → ₴
+  // если доставка указана вручную в гривнах — используем её напрямую,
+  // вес и коэффициент в этом случае не учитываются
+  const manualShip=(p.shipManual!=null&&p.shipManual!=='')?parseFloat(p.shipManual):null;
+  const shipUSD=manualShip!=null?(s.uah>0?manualShip/s.uah:0):(parseFloat(p.weight)||0)*coeff;    // вес × коэф. в $
+  const shipUAH=manualShip!=null?manualShip:shipUSD*s.uah;                       // доставка $ → ₴
   const buyUAH=itemUAH+shipUAH;
   const buyUSD=s.uah>0?buyUAH/s.uah:0;
   const saleUAH=parseFloat(p.sale)||0;
@@ -606,7 +614,7 @@ function render(){
         <h3>${p.name||'Без названия'}</h3>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
-          <div class="r"><span>Вес · доставка ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}</b></div>
+          <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка (вручную)':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
           ${(p.buyDate||p.saleDate)?`<div class="r"><span>Купл. · продано</span><b>${fmtDate(p.buyDate)||'—'} · ${fmtDate(p.saleDate)||'—'}</b></div>`:''}
         </div>
         <div class="price-block">
@@ -659,7 +667,7 @@ window.addEventListener('orientationchange',()=>setTimeout(syncFooterPadding,150
 
 // modal
 function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
-  ['f-img','f-name','f-item','f-weight','f-coeff','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
+  ['f-img','f-name','f-item','f-weight','f-coeff','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
   // была нажата одна из кнопок «Часы»/«Конструктор 1»/«Конструктор 2»)
   document.getElementById('f-category').value=currentCategory;
@@ -675,6 +683,7 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
   document.getElementById('f-coeff').value=p.coeff||'';
+  document.getElementById('f-shipmanual').value=p.shipManual||'';
   document.getElementById('f-sale').value=p.sale||'';
   document.getElementById('f-buydate').value=p.buyDate||'';
   document.getElementById('f-saledate').value=p.saleDate||'';
@@ -739,6 +748,7 @@ function updatePreview(){const u=document.getElementById('f-img').value;const pv
 function recalc(){
   const p={img:document.getElementById('f-img').value,item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,coeff:document.getElementById('f-coeff').value,
+    shipManual:document.getElementById('f-shipmanual').value,
     sale:document.getElementById('f-sale').value};
   const c=compute(p);
   document.getElementById('c-item').textContent=fmt(c.itemUAH,' ₴');
@@ -758,6 +768,7 @@ async function saveProduct(){
     item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,
     coeff:document.getElementById('f-coeff').value,
+    shipManual:document.getElementById('f-shipmanual').value,
     sale:document.getElementById('f-sale').value,
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,

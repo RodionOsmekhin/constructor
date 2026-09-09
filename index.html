@@ -105,8 +105,10 @@
   .modal .mhead h2{margin:0;font-size:18px}
   .modal .mbody{padding:20px;display:flex;flex-direction:column;gap:14px}
   .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .req{color:var(--red)}
   .field input,.field textarea,.field select{width:100%;background:var(--panel2);border:1px solid var(--line);
     color:var(--text);border-radius:9px;padding:11px 12px;font-size:15px;font-family:inherit}
+  .field input.invalid,.field select.invalid{border-color:var(--red);box-shadow:0 0 0 1px var(--red)}
   .field textarea{resize:vertical;min-height:56px}
   .field .hint{font-size:11px;color:var(--muted);margin-top:4px}
   .field2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
@@ -154,8 +156,9 @@
      закупку/продажу и т.п. с первого взгляда */
   #statsBody td:nth-child(2),#statsFoot td:nth-child(2){color:var(--red)}
   #statsBody td:nth-child(3),#statsFoot td:nth-child(3){color:var(--green)}
-  #statsProductsBody td:nth-child(2),#statsProductsFoot td:nth-child(2){color:var(--red)}
-  #statsProductsBody td:nth-child(3),#statsProductsFoot td:nth-child(3){color:var(--green)}
+  #statsSubcatBody td:nth-child(3),#statsSubcatFoot td:nth-child(3){color:var(--gold)}
+  #statsSubcatBody td:nth-child(4),#statsSubcatFoot td:nth-child(4){color:var(--red)}
+  #statsSubcatBody td:nth-child(5),#statsSubcatFoot td:nth-child(5){color:var(--green)}
   #stockBody td:nth-child(3){color:var(--gold)}
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
   .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
@@ -171,6 +174,8 @@
   .stock-table .qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   .stock-table .remain{font-weight:800;color:var(--green)}
   .stock-table .remain.zero{color:var(--muted)}
+  .stock-group-row td{background:var(--panel2);color:var(--muted);font-size:11px;font-weight:700;
+    text-transform:uppercase;letter-spacing:.5px;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line)}
   .stock-table th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
   .stock-table th.sortable:hover{color:var(--text)}
   .stock-table th.sortable .th-label{display:inline-flex;align-items:center;justify-content:center;gap:2px}
@@ -290,23 +295,21 @@
     </table>
     <div class="stats-empty" id="stockEmpty" style="display:none">Нет товаров</div>
 
-    <div class="stats-section-title">Разбивка по проданным товарам</div>
-    <table class="stats-table">
-      <thead><tr><th>Товар</th><th>Закупка</th><th>Продажа</th><th>Прибыль</th></tr></thead>
-      <tbody id="statsProductsBody"></tbody>
-      <tfoot id="statsProductsFoot"></tfoot>
-    </table>
-    <div class="stats-empty" id="statsProductsEmpty" style="display:none">Пока нет проданных товаров</div>
-    <div class="stats-chart-wrap">
-      <canvas id="chartProducts" height="110"></canvas>
+    <div id="statsSubcatSection">
+      <div class="stats-section-title">Разбивка по подкатегориям (Часы)</div>
+      <table class="stats-table">
+        <thead><tr><th>Подкатегория</th><th>Всего</th><th>Продано</th><th>Закупка</th><th>Продажа</th><th>Прибыль</th></tr></thead>
+        <tbody id="statsSubcatBody"></tbody>
+        <tfoot id="statsSubcatFoot"></tfoot>
+      </table>
+      <div class="stats-empty" id="statsSubcatEmpty" style="display:none">Пока нет товаров категории «Часы» с известной подкатегорией</div>
     </div>
   </div>
 
   <div class="cat-tabs" id="catTabs">
     <button class="cat-tab active" data-cat="" onclick="setCategory('')">Все</button>
     <button class="cat-tab" data-cat="clock" onclick="setCategory('clock')">🕒 Часы</button>
-    <button class="cat-tab" data-cat="constructor1" onclick="setCategory('constructor1')">🧱 Конструктор 1</button>
-    <button class="cat-tab" data-cat="constructor2" onclick="setCategory('constructor2')">🧱 Конструктор 2</button>
+    <button class="cat-tab" data-cat="constructor1" onclick="setCategory('constructor1')">🧱 Конструктор</button>
   </div>
   <div id="grid" class="grid"></div>
   <div id="empty" class="empty" style="display:none">
@@ -342,7 +345,8 @@
         <input id="f-img" type="url" placeholder="https://..." oninput="updatePreview();recalc()">
       </div>
       <div class="field">
-        <label>Название</label>
+        <label>Название <span class="req">*</span></label>
+        <select id="f-subcategory" style="display:none;margin-bottom:8px" onchange="updateNameSuggestions()"></select>
         <select id="f-name-select" style="display:none" onchange="onNameSelect()"></select>
         <input id="f-name" type="text" placeholder="Например: часы Miniso">
         <div class="hint" id="f-name-hint" style="display:none">Выберите товар из списка выше — название и фото подставятся сами. Список можно открыть повторно и выбрать другой товар в любой момент.</div>
@@ -352,8 +356,7 @@
         <select id="f-category" onchange="updateNameSuggestions()">
           <option value="">Без категории</option>
           <option value="clock">🕒 Часы</option>
-          <option value="constructor1">🧱 Конструктор 1</option>
-          <option value="constructor2">🧱 Конструктор 2</option>
+          <option value="constructor1">🧱 Конструктор</option>
         </select>
       </div>
       <div class="field">
@@ -365,19 +368,19 @@
       </div>
       <div class="field2">
         <div class="field">
-          <label>Стоимость товара</label>
+          <label>Стоимость товара <span class="req">*</span></label>
           <input id="f-item" type="number" step="0.01" placeholder="0" oninput="recalc()">
           <div class="hint">в юанях ¥</div>
         </div>
         <div class="field">
-          <label>Вес</label>
-          <input id="f-weight" type="number" step="0.01" placeholder="0" oninput="recalc()">
-          <div class="hint">в кг</div>
+          <label>Вес <span class="req" id="weight-req">*</span></label>
+          <input id="f-weight" type="number" step="0.01" placeholder="0" oninput="recalc();toggleWeightRequired()">
+          <div class="hint" id="weight-hint">в кг</div>
         </div>
       </div>
       <div class="field2">
         <div class="field">
-          <label>Коэф. доставки (необяз.)</label>
+          <label>Коэф. доставки</label>
           <input id="f-coeff" type="number" step="0.1" placeholder="общий" oninput="recalc()">
           <div class="hint">$ / кг · пусто = общий</div>
         </div>
@@ -388,22 +391,22 @@
         </div>
       </div>
       <div class="field">
-        <label>Доставка напрямую в гривнах (необязательно)</label>
-        <input id="f-shipmanual" type="number" step="1" placeholder="0" oninput="recalc()">
-        <div class="hint">если указано — вес и коэффициент доставки не используются, доставка = это число</div>
+        <label>Доставка напрямую в гривнах <span class="req" id="shipmanual-req">*</span></label>
+        <input id="f-shipmanual" type="number" step="1" placeholder="0" oninput="recalc();toggleWeightRequired()">
+        <div class="hint">нужно указать либо Доставка напрямую либо вес</div>
       </div>
       <div class="field2">
         <div class="field">
-          <label>Дата покупки (необяз.)</label>
-          <input id="f-buydate" type="date">
+          <label>Дата покупки <span class="req">*</span></label>
+          <input id="f-buydate" type="date" required>
         </div>
         <div class="field">
-          <label>Дата продажи (необяз.)</label>
+          <label>Дата продажи</label>
           <input id="f-saledate" type="date">
         </div>
       </div>
       <div class="field">
-        <label>Комментарий (необязательно)</label>
+        <label>Комментарий</label>
         <textarea id="f-comment" placeholder="Любые заметки к товару..."></textarea>
       </div>
       <div class="calc-box" id="calc">
@@ -426,7 +429,7 @@ const LS_ITEMS='constructor_items', LS_SET='constructor_settings';
 let items=[], editId=null;
 
 // категория — просто фильтр отображения (как раньше делали кнопки
-// «Часы»/«Конструктор 1»/«Конструктор 2»), а не отдельный набор данных:
+// «Часы»/«Конструктор»), а не отдельный набор данных:
 // товары всех категорий лежат в одной общей таблице.
 const LS_CATEGORY='constructor_category';
 let currentCategory=localStorage.getItem(LS_CATEGORY)||'';
@@ -491,7 +494,11 @@ async function loadFromSheet(){
     if(!resp.ok)throw new Error('HTTP '+resp.status);
     const data=await resp.json();
     if(!data.ok)throw new Error(data.error||'неизвестная ошибка сервера');
-    if(Array.isArray(data.items))items=normalizeItemDates(data.items);
+    // строки из таблицы идут в порядке добавления (новые — в конце листа),
+    // а на экране новые товары должны быть сверху — разворачиваем порядок,
+    // чтобы это совпадало с тем, как новый товар появляется сразу после
+    // добавления (без ожидания перезагрузки/обновления страницы)
+    if(Array.isArray(data.items))items=normalizeItemDates(data.items).reverse();
     if(data.settings){const s=data.settings;
       document.getElementById('s-coeff').value=s.coeff;
       document.getElementById('s-cny').value=s.cny;
@@ -614,7 +621,7 @@ function render(){
         <h3>${p.name||'Без названия'}</h3>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
-          <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка (вручную)':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
+          <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка в ₴':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
           ${(p.buyDate||p.saleDate)?`<div class="r"><span>Купл. · продано</span><b>${fmtDate(p.buyDate)||'—'} · ${fmtDate(p.saleDate)||'—'}</b></div>`:''}
         </div>
         <div class="price-block">
@@ -666,29 +673,48 @@ window.addEventListener('resize',syncFooterPadding);
 window.addEventListener('orientationchange',()=>setTimeout(syncFooterPadding,150));
 
 // modal
+function todayISO(){const d=new Date();const pad=n=>String(n).padStart(2,'0');
+  return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
+// нужно заполнить хотя бы одно из двух: либо вес (для расчёта доставки по
+// весу × коэффициенту), либо доставку напрямую в гривнах — как только одно
+// из полей заполнено, звёздочка-обязательность у второго снимается
+function toggleWeightRequired(){
+  const hasManual=!!document.getElementById('f-shipmanual').value;
+  const hasWeight=!!document.getElementById('f-weight').value;
+  document.getElementById('weight-req').style.display=hasManual?'none':'inline';
+  document.getElementById('shipmanual-req').style.display=hasWeight?'none':'inline';
+  document.getElementById('weight-hint').textContent=hasManual?'в кг · не обязательно, указана доставка напрямую':'в кг';
+}
 function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
   ['f-img','f-name','f-item','f-weight','f-coeff','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
+  // дата покупки — обязательное поле, по умолчанию сегодняшняя дата
+  document.getElementById('f-buydate').value=todayISO();
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
-  // была нажата одна из кнопок «Часы»/«Конструктор 1»/«Конструктор 2»)
+  // была нажата одна из кнопок «Часы»/«Конструктор»)
   document.getElementById('f-category').value=currentCategory;
+  document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
-  updateNameSuggestions();
+  updateNameSuggestions();toggleWeightRequired();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('modal-title').textContent='Изменить товар';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-category').value=p.category||'';
+  // если товар совпадает с известным названием из списка «Часы» — сразу
+  // подставляем его подкатегорию, чтобы список названий не был пустым
+  const knownMatch=CLOCK_NAMES.find(c=>c.name===p.name);
+  document.getElementById('f-subcategory').value=knownMatch?knownMatch.sub:'';
   document.getElementById('f-shipmethod').value=p.shipMethod||'sea';
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
   document.getElementById('f-coeff').value=p.coeff||'';
   document.getElementById('f-shipmanual').value=p.shipManual||'';
   document.getElementById('f-sale').value=p.sale||'';
-  document.getElementById('f-buydate').value=p.buyDate||'';
+  document.getElementById('f-buydate').value=p.buyDate||todayISO();
   document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
-  updateNameSuggestions();
+  updateNameSuggestions();toggleWeightRequired();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
@@ -696,44 +722,66 @@ function closeModal(){document.getElementById('overlay').classList.remove('open'
 // товаров) — при выборе категории «Часы» они предлагаются как список для
 // поля «Название», а при выборе точного названия из списка автоматически
 // подставляется ссылка на фото этого товара.
+// sub: 'hp' = Harry Potter, 'toothless' = Беззубик/How to Train Your Dragon,
+// 'other' = рандом-боксы и всё, что не относится к конкретной подкатегории
 const CLOCK_NAMES=[
-  {name:'рандом',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
-  {name:'рандом море',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
-  {name:'рандом авиа',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁'},
-  {name:'рандом12',img:'https://content2.rozetka.com.ua/goods/images/big/680233314.jpg',emoji:'🎁'},
-  {name:'Гриффиндор',img:'https://content.rozetka.com.ua/goods/images/big/680233319.jpg',emoji:'🦁'},
-  {name:'Хаффлпаф',img:'https://content2.rozetka.com.ua/goods/images/big/680233321.jpg',emoji:'🦡'},
-  {name:'Слизерин',img:'https://content2.rozetka.com.ua/goods/images/big/680233324.jpg',emoji:'🐍'},
-  {name:'Рэйвенкло',img:'https://content.rozetka.com.ua/goods/images/big/680233323.jpg',emoji:'🦅'},
-  {name:'Торт',img:'https://content1.rozetka.com.ua/goods/images/big/680233320.jpg',emoji:'🎂'},
-  {name:'Сладкое королевство',img:'https://content2.rozetka.com.ua/goods/images/big/680233327.jpg',emoji:'🍬'},
-  {name:'Министерство Магии',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823pj-mpc68nh0rochf1',emoji:'🏛️'},
-  {name:'Патронус',img:'https://content.rozetka.com.ua/goods/images/big/680233325.jpg',emoji:'🐺'},
-  {name:'9¾',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823r0-mop707vf7egxc2',emoji:'🚂'},
-  {name:'Сова',img:'https://content.rozetka.com.ua/goods/images/big/680233322.jpg',emoji:'🦉'},
-  {name:'Черная метка',img:'https://content.rozetka.com.ua/goods/images/big/680233326.jpg',emoji:'☠️'},
-  {name:'Дары смерти',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'△'},
-  {name:'Карта мародеров',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'🗺️'},
-  {name:'Снитч',img:'https://ae-pic-a1.aliexpress-media.com/kf/S84f07e85bc09488f836a5b732ede22705.jpg_640x640.jpg',emoji:'🏅'},
-  {name:'Ночное крыло',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/4.webp',emoji:'🌑🐉'},
-  {name:'Кодекс викингов',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/6.webp',emoji:'⚔️'},
-  {name:'беззубик',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/2.webp',emoji:'🐲'}
+  {name:'рандом',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁',sub:'hp'},
+  {name:'рандом море',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁',sub:'hp'},
+  {name:'рандом авиа',img:'https://http2.mlstatic.com/D_NQ_NP_636580-CBT112651552933_062026-O.webp',emoji:'🎁',sub:'hp'},
+  {name:'рандом12',img:'https://content2.rozetka.com.ua/goods/images/big/680233314.jpg',emoji:'🎁',sub:'hp'},
+  {name:'Торт',img:'https://content1.rozetka.com.ua/goods/images/big/680233320.jpg',emoji:'🎂',sub:'hp'},
+  {name:'Гриффиндор',img:'https://content.rozetka.com.ua/goods/images/big/680233319.jpg',emoji:'🦁',sub:'hp'},
+  {name:'Хаффлпаф',img:'https://content2.rozetka.com.ua/goods/images/big/680233321.jpg',emoji:'🦡',sub:'hp'},
+  {name:'Слизерин',img:'https://content2.rozetka.com.ua/goods/images/big/680233324.jpg',emoji:'🐍',sub:'hp'},
+  {name:'Рэйвенкло',img:'https://content.rozetka.com.ua/goods/images/big/680233323.jpg',emoji:'🦅',sub:'hp'},
+  {name:'Сладкое королевство',img:'https://content2.rozetka.com.ua/goods/images/big/680233327.jpg',emoji:'🍬',sub:'hp'},
+  {name:'Министерство Магии',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823pj-mpc68nh0rochf1',emoji:'🏛️',sub:'hp'},
+  {name:'Патронус',img:'https://content.rozetka.com.ua/goods/images/big/680233325.jpg',emoji:'🐺',sub:'hp'},
+  {name:'9¾',img:'https://down-ph.img.susercontent.com/file/sg-11134201-823r0-mop707vf7egxc2',emoji:'🚂',sub:'hp'},
+  {name:'Сова',img:'https://content.rozetka.com.ua/goods/images/big/680233322.jpg',emoji:'🦉',sub:'hp'},
+  {name:'Черная метка',img:'https://content.rozetka.com.ua/goods/images/big/680233326.jpg',emoji:'☠️',sub:'hp'},
+  {name:'Дары смерти',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'△',sub:'hp'},
+  {name:'Карта мародеров',img:'https://content.rozetka.com.ua/goods/images/big/680233318.jpg',emoji:'🗺️',sub:'hp'},
+  {name:'Снитч',img:'https://ae-pic-a1.aliexpress-media.com/kf/S84f07e85bc09488f836a5b732ede22705.jpg_640x640.jpg',emoji:'🏅',sub:'hp'},
+  {name:'Ночное крыло',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/4.webp',emoji:'🌑🐉',sub:'toothless'},
+  {name:'Кодекс викингов',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/6.webp',emoji:'⚔️',sub:'toothless'},
+  {name:'беззубик',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/2.webp',emoji:'🐲',sub:'toothless'}
 ];
+const CLOCK_SUBCATEGORIES=[
+  {value:'hp',label:'⚡ Harry Potter'},
+  {value:'toothless',label:'🐉 Toothless'}
+];
+document.getElementById('f-subcategory').innerHTML='<option value="">— подкатегория —</option>'+
+  CLOCK_SUBCATEGORIES.map(s=>`<option value="${s.value}">${s.label}</option>`).join('');
 // список для быстрого выбора товара категории «Часы» — обычный select
 // (а не datalist), чтобы он открывался как надо на любом устройстве и его
-// можно было открывать и выбирать заново сколько угодно раз.
+// можно было открывать и выбирать заново сколько угодно раз. Список сначала
+// сужается до подкатегории (Harry Potter / Toothless / другое), и только
+// потом показывает названия именно этой подкатегории — без лишних вариантов.
 function updateNameSuggestions(){
+  const subSel=document.getElementById('f-subcategory');
   const sel=document.getElementById('f-name-select');
   const isClock=document.getElementById('f-category').value==='clock';
-  if(isClock){
+  subSel.style.display=isClock?'block':'none';
+  if(!isClock){
+    subSel.value='';
+    sel.style.display='none';
+    document.getElementById('f-name-hint').style.display='none';
+    return;
+  }
+  const sub=subSel.value;
+  if(sub){
+    const opts=CLOCK_NAMES.filter(c=>c.sub===sub);
     sel.innerHTML='<option value="">— выбрать товар —</option>'+
-      CLOCK_NAMES.map(c=>`<option value="${escapeHtml(c.name)}">${c.emoji?c.emoji+' ':''}${escapeHtml(c.name)}</option>`).join('');
+      opts.map(c=>`<option value="${escapeHtml(c.name)}">${c.emoji?c.emoji+' ':''}${escapeHtml(c.name)}</option>`).join('');
     // если текущее название совпадает с одним из известных — сразу отмечаем его в списке
     const cur=document.getElementById('f-name').value;
-    sel.value=CLOCK_NAMES.some(c=>c.name===cur)?cur:'';
+    sel.value=opts.some(c=>c.name===cur)?cur:'';
+    sel.style.display='block';
+  }else{
+    sel.style.display='none';
   }
-  sel.style.display=isClock?'block':'none';
-  document.getElementById('f-name-hint').style.display=isClock?'block':'none';
+  document.getElementById('f-name-hint').style.display=sub?'block':'none';
 }
 function onNameSelect(){
   const sel=document.getElementById('f-name-select');
@@ -760,7 +808,33 @@ function recalc(){
     pe.style.color=c.profit>=0?'var(--green)':'var(--red)';}
   else{pe.textContent='—';pe.style.color='var(--text)';}
 }
+// подсветка обязательных полей вместо всплывающего окна: если поле не
+// заполнено — у него появляется красная рамка, снимается она сразу при
+// вводе (см. делегированный обработчик input/change на #overlay ниже)
+function clearFieldInvalid(){document.querySelectorAll('.overlay .invalid').forEach(el=>el.classList.remove('invalid'));}
+document.getElementById('overlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
+document.getElementById('overlay').addEventListener('change',e=>e.target.classList.remove('invalid'));
 async function saveProduct(){
+  // проверка обязательных полей — карточка не должна создаваться/сохраняться,
+  // если хоть одно из них не заполнено
+  clearFieldInvalid();
+  const invalidIds=[];
+  if(!document.getElementById('f-name').value.trim())invalidIds.push('f-name');
+  const itemVal=document.getElementById('f-item').value;
+  if(itemVal===''||isNaN(parseFloat(itemVal)))invalidIds.push('f-item');
+  // вес не обязателен, если доставка указана напрямую в гривнах
+  const weightVal=document.getElementById('f-weight').value;
+  const shipManualVal=document.getElementById('f-shipmanual').value;
+  if(!shipManualVal&&(weightVal===''||isNaN(parseFloat(weightVal)))){
+    invalidIds.push('f-weight');invalidIds.push('f-shipmanual');
+  }
+  if(!document.getElementById('f-buydate').value)invalidIds.push('f-buydate');
+  if(invalidIds.length){
+    invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
+    document.getElementById(invalidIds[0]).scrollIntoView({behavior:'smooth',block:'center'});
+    document.getElementById(invalidIds[0]).focus();
+    return;
+  }
   const p={img:document.getElementById('f-img').value.trim(),
     name:document.getElementById('f-name').value.trim(),
     category:document.getElementById('f-category').value,
@@ -920,7 +994,7 @@ function toggleStats(){
 }
 const MONTHS=['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
 function monthLabel(key){const[y,m]=key.split('-');return MONTHS[parseInt(m,10)-1]+' '+y;}
-let statsChart=null, statsProductsChart=null;
+let statsChart=null;
 
 // Остаток = «Кол-во» (сколько куплено/есть этого товара) минус «Продано»
 // (1, если у товара стоит дата продажи — сейчас на один товар одна продажа).
@@ -954,6 +1028,17 @@ function updateStockSortArrows(){
     el.classList.toggle('active',active);
   });
 }
+// визуально делим «Остатки» на разделы: для «Часы» — по подкатегории
+// (Harry Potter / Toothless / без подкатегории), для остальных — по категории
+const STOCK_SECTION_LABELS={hp:'⚡ Harry Potter',toothless:'🐉 Toothless','clock-other':'🕒 Часы — другое',
+  constructor1:'🧱 Конструктор',none:'Без категории'};
+const STOCK_SECTION_ORDER=['hp','toothless','clock-other','constructor1','none'];
+function stockSectionKey(g){
+  const item=items.find(x=>x.id===g.ids[0]);
+  if(!item)return'none';
+  if(item.category==='clock')return getSubcategory(g.name)||'clock-other';
+  return item.category||'none';
+}
 function renderStock(){
   const tbody=document.getElementById('stockBody');
   if(!tbody)return;
@@ -969,22 +1054,37 @@ function renderStock(){
     if(p.saleDate)groups[key].sold++;
   });
   const rows=Object.values(groups).map(g=>({...g,remain:Math.max(0,g.qty-g.sold)}));
-  if(stockSort.col){
-    rows.sort((a,b)=>(a[stockSort.col]-b[stockSort.col])*stockSort.dir);
-  }else{
-    rows.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
-  }
+  const sortRows=arr=>{
+    if(stockSort.col)arr.sort((a,b)=>(a[stockSort.col]-b[stockSort.col])*stockSort.dir);
+    else arr.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+    return arr;
+  };
   updateStockSortArrows();
-  tbody.innerHTML=rows.map(g=>{
-    const remain=g.remain;
-    return`<tr>
-      <td>${escapeHtml(g.name)}</td>
-      <td><input class="qty-input" type="number" min="0" step="1" value="${g.qty}"
-        onchange="updateGroupQty('${g.ids.join(',')}',this.value)"></td>
-      <td>${g.sold}</td>
-      <td class="remain${remain===0?' zero':''}">${remain}</td>
-    </tr>`;
-  }).join('');
+  // группируем по разделу, сохраняя порядок STOCK_SECTION_ORDER, и сортируем
+  // строки внутри каждого раздела отдельно
+  const bySection={};
+  rows.forEach(g=>{
+    const key=stockSectionKey(g);
+    (bySection[key]=bySection[key]||[]).push(g);
+  });
+  let html='';
+  STOCK_SECTION_ORDER.forEach(key=>{
+    const arr=bySection[key];
+    if(!arr||!arr.length)return;
+    sortRows(arr);
+    html+=`<tr class="stock-group-row"><td colspan="4">${STOCK_SECTION_LABELS[key]}</td></tr>`;
+    html+=arr.map(g=>{
+      const remain=g.remain;
+      return`<tr>
+        <td>${escapeHtml(g.name)}</td>
+        <td><input class="qty-input" type="number" min="0" step="1" value="${g.qty}"
+          onchange="updateGroupQty('${g.ids.join(',')}',this.value)"></td>
+        <td>${g.sold}</td>
+        <td class="remain${remain===0?' zero':''}">${remain}</td>
+      </tr>`;
+    }).join('');
+  });
+  tbody.innerHTML=html;
   const stockFoot=document.getElementById('stockFoot');
   if(stockFoot){
     const tQty=rows.reduce((s,g)=>s+g.qty,0), tSold=rows.reduce((s,g)=>s+g.sold,0),
@@ -1032,8 +1132,60 @@ async function updateGroupQty(idsStr,value){
   }
 }
 
+// по названию товара определяем его подкатегорию (Harry Potter / Toothless)
+// из справочника CLOCK_NAMES — сама подкатегория не хранится в товаре,
+// а определяется по названию каждый раз при отрисовке статистики
+function getSubcategory(name){
+  const m=CLOCK_NAMES.find(c=>c.name===name);
+  return m?m.sub:null;
+}
+const SUBCAT_LABELS={hp:'⚡ Harry Potter',toothless:'🐉 Toothless'};
+function renderSubcatStats(){
+  const section=document.getElementById('statsSubcatSection');
+  // на вкладке «Конструктор» подкатегории (Harry Potter/Toothless) не
+  // относятся к делу — раздел просто скрываем
+  if(currentCategory==='constructor1'){
+    if(section)section.style.display='none';
+    return;
+  }
+  if(section)section.style.display='block';
+  const tbody=document.getElementById('statsSubcatBody'), tfoot=document.getElementById('statsSubcatFoot');
+  if(!tbody)return;
+  // считаем ВСЕ товары подкатегории, не только проданные — иначе пока ничего
+  // не продано, прибыль показывала бы 0 вместо честного минуса (деньги на
+  // закупку уже потрачены, а продажи ещё не было). Подкатегории показываем
+  // всегда, даже если по одной из них пока вообще нет продаж.
+  const groups={};
+  Object.keys(SUBCAT_LABELS).forEach(k=>{groups[k]={key:k,total:0,sold:0,buy:0,sale:0,profit:0};});
+  items.filter(p=>p.category==='clock').forEach(p=>{
+    const sub=getSubcategory(p.name)||'—';
+    if(!groups[sub])groups[sub]={key:sub,total:0,sold:0,buy:0,sale:0,profit:0};
+    const c=compute(p);
+    groups[sub].total++;
+    // в "Продажа" считаем выручку только у реально проданных товаров (есть
+    // дата продажи) — у непроданных цена продажи может быть уже указана
+    // заранее (ожидаемая), и её нельзя засчитывать как реальную выручку
+    const realSale=p.saleDate?c.saleUAH:0;
+    if(p.saleDate)groups[sub].sold++;
+    groups[sub].buy+=c.buyUAH;groups[sub].sale+=realSale;groups[sub].profit+=(realSale-c.buyUAH);
+  });
+  const rows=Object.values(groups).sort((a,b)=>b.profit-a.profit);
+  document.getElementById('statsSubcatEmpty').style.display=rows.length?'none':'block';
+  let tBuy=0,tSale=0,tTotal=0,tSold=0;
+  tbody.innerHTML=rows.map(g=>{
+    tBuy+=g.buy;tSale+=g.sale;tTotal+=g.total;tSold+=g.sold;
+    const pc=g.profit>=0?'pos':'neg';
+    const label=SUBCAT_LABELS[g.key]||'Без подкатегории';
+    return`<tr><td>${label}</td><td>${g.total}</td><td>${g.sold}</td><td>${fmt(g.buy,' ₴')}</td><td>${fmt(g.sale,' ₴')}</td>
+      <td class="${pc}">${fmt(g.profit,' ₴')}</td></tr>`;
+  }).join('');
+  const tProfit=tSale-tBuy, tpc=tProfit>=0?'pos':'neg';
+  tfoot.innerHTML=rows.length?`<tr><td>Итого</td><td>${tTotal}</td><td>${tSold}</td><td>${fmt(tBuy,' ₴')}</td><td>${fmt(tSale,' ₴')}</td>
+    <td class="${tpc}">${fmt(tProfit,' ₴')}</td></tr>`:'';
+}
 function renderStats(){
   renderStock();
+  renderSubcatStats();
   const spend={},income={};
   visibleItems().forEach(p=>{
     const c=compute(p);
@@ -1082,54 +1234,6 @@ function renderStats(){
     }
   });
 
-  // разбивка по товарам — считаем только реально проданные (есть цена продажи),
-  // сгруппированные по groupKey (см. определение выше)
-  const groups={};
-  visibleItems().filter(p=>!!p.saleDate).forEach(p=>{
-    const c=compute(p), key=groupKey(p.name);
-    if(!groups[key])groups[key]={name:key,buy:0,sale:0,profit:0,qty:0};
-    groups[key].buy+=c.buyUAH;groups[key].sale+=c.saleUAH;groups[key].profit+=c.profit;groups[key].qty++;
-  });
-  const soldItems=Object.values(groups).sort((a,b)=>b.profit-a.profit);
-
-  const pBody=document.getElementById('statsProductsBody'), pFoot=document.getElementById('statsProductsFoot');
-  document.getElementById('statsProductsEmpty').style.display=soldItems.length?'none':'block';
-  let pBuy=0,pSale=0;
-  pBody.innerHTML=soldItems.map(it=>{
-    pBuy+=it.buy;pSale+=it.sale;
-    const pc=it.profit>=0?'pos':'neg';
-    const label=it.qty>1?`${it.name} ×${it.qty}`:it.name;
-    return`<tr><td>${escapeHtml(label)}</td><td>${fmt(it.buy,' ₴')}</td><td>${fmt(it.sale,' ₴')}</td>
-      <td class="${pc}">${fmt(it.profit,' ₴')}</td></tr>`;
-  }).join('');
-  const pProfit=pSale-pBuy, pPc=pProfit>=0?'pos':'neg';
-  pFoot.innerHTML=soldItems.length?`<tr><td>Итого</td><td>${fmt(pBuy,' ₴')}</td><td>${fmt(pSale,' ₴')}</td>
-    <td class="${pPc}">${fmt(pProfit,' ₴')}</td></tr>`:'';
-
-  // график по товарам (топ-10 по прибыли) — по аналогии с месячным графиком
-  const topItems=soldItems.slice(0,10);
-  const pLabels=topItems.length?topItems.map(it=>it.qty>1?`${it.name} ×${it.qty}`:it.name):['Нет данных'];
-  const pCtx=document.getElementById('chartProducts').getContext('2d');
-  if(statsProductsChart)statsProductsChart.destroy();
-  statsProductsChart=new Chart(pCtx,{
-    type:'bar',
-    data:{
-      labels:pLabels,
-      datasets:[
-        {label:'Закупка',data:topItems.map(it=>it.buy),backgroundColor:'#ff5d6c'},
-        {label:'Продажа',data:topItems.map(it=>it.sale),backgroundColor:'#2fbf71'},
-        {label:'Прибыль',data:topItems.map(it=>it.profit),type:'line',borderColor:'#ffbf47',backgroundColor:'#ffbf47',tension:.3}
-      ]
-    },
-    options:{
-      responsive:true,
-      plugins:{legend:{labels:{color:'#e8eaf0'}}},
-      scales:{
-        x:{ticks:{color:'#8b93a7',maxRotation:40,minRotation:0},grid:{color:'#2a2f3a'}},
-        y:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}}
-      }
-    }
-  });
 }
 
 document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===currentCategory));

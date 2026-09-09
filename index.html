@@ -171,6 +171,12 @@
   .stock-table .qty-input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   .stock-table .remain{font-weight:800;color:var(--green)}
   .stock-table .remain.zero{color:var(--muted)}
+  .stock-table th.sortable{cursor:pointer;user-select:none;white-space:nowrap}
+  .stock-table th.sortable:hover{color:var(--text)}
+  .stock-table th.sortable .th-label{display:inline-flex;align-items:center;justify-content:center;gap:2px}
+  .stock-table .sort-arrow{display:inline-flex;align-items:center;justify-content:center;
+    width:8px;height:8px;font-size:8px;line-height:1;color:var(--muted);transform:translateY(-1.5px)}
+  .stock-table .sort-arrow.active{color:var(--accent)}
 
   /* мобильные экраны — одна колонка, компактная горизонтальная карточка
      (картинка слева небольшим квадратом, суть — справа), чтобы на экране
@@ -274,7 +280,11 @@
 
     <div class="stats-section-title">Остатки</div>
     <table class="stats-table stock-table">
-      <thead><tr><th>Товар</th><th>Кол-во</th><th>Продано</th><th>Остаток</th></tr></thead>
+      <thead><tr><th>Товар</th>
+        <th class="sortable" onclick="setStockSort('qty')"><span class="th-label">Кол-во<span class="sort-arrow" id="sortArrow-qty"></span></span></th>
+        <th class="sortable" onclick="setStockSort('sold')"><span class="th-label">Продано<span class="sort-arrow" id="sortArrow-sold"></span></span></th>
+        <th class="sortable" onclick="setStockSort('remain')"><span class="th-label">Остаток<span class="sort-arrow" id="sortArrow-remain"></span></span></th>
+      </tr></thead>
       <tbody id="stockBody"></tbody>
     </table>
     <div class="stats-empty" id="stockEmpty" style="display:none">Нет товаров</div>
@@ -849,6 +859,23 @@ function groupKey(name){
   const cleaned=(name||'').replace(/\s*[№#]\s*\d+\s*/g,' ').replace(/\s+/g,' ').trim();
   return cleaned||'Без названия';
 }
+// сортировка таблицы "Остатки" по клику на заголовок Кол-во/Продано/Остаток —
+// повторный клик по тому же заголовку переключает направление (возрастание/убывание)
+let stockSort={col:null,dir:1};
+function setStockSort(col){
+  if(stockSort.col===col)stockSort.dir=-stockSort.dir;
+  else{stockSort.col=col;stockSort.dir=1;}
+  renderStock();
+}
+function updateStockSortArrows(){
+  ['qty','sold','remain'].forEach(col=>{
+    const el=document.getElementById('sortArrow-'+col);
+    if(!el)return;
+    const active=stockSort.col===col;
+    el.textContent=active?(stockSort.dir===1?'▲':'▼'):'↕';
+    el.classList.toggle('active',active);
+  });
+}
 function renderStock(){
   const tbody=document.getElementById('stockBody');
   if(!tbody)return;
@@ -863,9 +890,15 @@ function renderStock(){
     groups[key].qty+=qty;
     if(p.saleDate)groups[key].sold++;
   });
-  const rows=Object.values(groups).sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  const rows=Object.values(groups).map(g=>({...g,remain:Math.max(0,g.qty-g.sold)}));
+  if(stockSort.col){
+    rows.sort((a,b)=>(a[stockSort.col]-b[stockSort.col])*stockSort.dir);
+  }else{
+    rows.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
+  }
+  updateStockSortArrows();
   tbody.innerHTML=rows.map(g=>{
-    const remain=Math.max(0,g.qty-g.sold);
+    const remain=g.remain;
     return`<tr>
       <td>${escapeHtml(g.name)}</td>
       <td><input class="qty-input" type="number" min="0" step="1" value="${g.qty}"

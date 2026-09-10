@@ -744,9 +744,9 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-category').value=p.category||'';
   // если товар совпадает с известным названием из списка «Часы» — сразу
-  // подставляем его подкатегорию, чтобы список названий не был пустым
-  const knownMatch=CLOCK_NAMES.find(c=>c.name===p.name);
-  document.getElementById('f-subcategory').value=knownMatch?knownMatch.sub:'';
+  // подставляем его подкатегорию (уточняя по фото, если название неоднозначно)
+  const sub=getSubcategory(p.name,p.img);
+  document.getElementById('f-subcategory').value=sub||'';
   document.getElementById('f-shipmethod').value=p.shipMethod||'sea';
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
@@ -787,7 +787,7 @@ const CLOCK_NAMES=[
   {name:'Снитч',img:'https://ae-pic-a1.aliexpress-media.com/kf/S84f07e85bc09488f836a5b732ede22705.jpg_640x640.jpg',emoji:'🏅',sub:'hp'},
   {name:'Ночное крыло',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/4.webp',emoji:'🌑🐉',sub:'toothless'},
   {name:'Кодекс викингов',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/6.webp',emoji:'⚔️',sub:'toothless'},
-  {name:'беззубик',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/2.webp',emoji:'🐲',sub:'toothless'}
+  {name:'рандом',img:'https://mow-basket-cdn-28.geobasket.ru/vol14958/part1495800/1495800026/images/big/2.webp',emoji:'🐲',sub:'toothless'}
 ];
 const CLOCK_SUBCATEGORIES=[
   {value:'hp',label:'⚡ Harry Potter'},
@@ -827,7 +827,12 @@ function updateNameSuggestions(){
 }
 function onNameSelect(){
   const sel=document.getElementById('f-name-select');
-  const match=CLOCK_NAMES.find(c=>c.name===sel.value);
+  const sub=document.getElementById('f-subcategory').value;
+  // ищем совпадение сначала внутри текущей подкатегории (на случай если
+  // одно и то же название встречается в нескольких подкатегориях, как
+  // "рандом" в Harry Potter и в другой подкатегории — иначе подставится
+  // не то фото), и только если там не нашлось — по всему списку
+  const match=CLOCK_NAMES.find(c=>c.name===sel.value&&c.sub===sub)||CLOCK_NAMES.find(c=>c.name===sel.value);
   if(!match)return;
   document.getElementById('f-name').value=match.name;
   if(match.img)document.getElementById('f-img').value=match.img;
@@ -1143,22 +1148,22 @@ function updateStockSortArrows(){
 const STOCK_SECTION_LABELS={hp:'⚡ Harry Potter',toothless:'🐉 Toothless','clock-other':'🕒 Часы — другое',
   constructor1:'🧱 Конструктор',none:'Без категории'};
 const STOCK_SECTION_ORDER=['hp','toothless','clock-other','constructor1','none'];
-function stockSectionKey(g){
-  const item=items.find(x=>x.id===g.ids[0]);
-  if(!item)return'none';
-  if(item.category==='clock')return getSubcategory(g.name)||'clock-other';
-  return item.category||'none';
-}
 function renderStock(){
   const tbody=document.getElementById('stockBody');
   if(!tbody)return;
   const list=visibleItems();
   document.getElementById('stockEmpty').style.display=list.length?'none':'block';
+  // раздел (категория/подкатегория) определяем СРАЗУ на уровне каждого товара
+  // и включаем в ключ группировки — иначе одинаково названные товары из
+  // разных подкатегорий (например "рандом" в Harry Potter и в Toothless)
+  // склеивались бы в одну строку и попадали в один раздел целиком
   const groups={};
   list.forEach(p=>{
-    const key=groupKey(p.name);
+    const nameKey=groupKey(p.name);
+    const section=p.category==='clock'?(getSubcategory(p.name,p.img)||'clock-other'):(p.category||'none');
+    const key=section+'||'+nameKey;
     const qty=(p.qty!==undefined&&p.qty!==''&&!isNaN(parseInt(p.qty,10)))?parseInt(p.qty,10):1;
-    if(!groups[key])groups[key]={name:key,ids:[],qty:0,sold:0};
+    if(!groups[key])groups[key]={name:nameKey,section:section,ids:[],qty:0,sold:0};
     groups[key].ids.push(p.id);
     groups[key].qty+=qty;
     if(p.saleDate)groups[key].sold++;
@@ -1174,8 +1179,7 @@ function renderStock(){
   // строки внутри каждого раздела отдельно
   const bySection={};
   rows.forEach(g=>{
-    const key=stockSectionKey(g);
-    (bySection[key]=bySection[key]||[]).push(g);
+    (bySection[g.section]=bySection[g.section]||[]).push(g);
   });
   let html='';
   STOCK_SECTION_ORDER.forEach(key=>{
@@ -1244,8 +1248,15 @@ async function updateGroupQty(idsStr,value){
 
 // по названию товара определяем его подкатегорию (Harry Potter / Toothless)
 // из справочника CLOCK_NAMES — сама подкатегория не хранится в товаре,
-// а определяется по названию каждый раз при отрисовке статистики
-function getSubcategory(name){
+// а определяется по названию каждый раз при отрисовке статистики.
+// Если название встречается в нескольких подкатегориях (например "рандом"
+// есть и в Harry Potter, и в Toothless) — уточняем по ссылке на фото,
+// т.к. у одинаково названных товаров из разных подкатегорий разные картинки.
+function getSubcategory(name,img){
+  if(img){
+    const byImg=CLOCK_NAMES.find(c=>c.name===name&&c.img===img);
+    if(byImg)return byImg.sub;
+  }
   const m=CLOCK_NAMES.find(c=>c.name===name);
   return m?m.sub:null;
 }
@@ -1268,7 +1279,7 @@ function renderSubcatStats(){
   const groups={};
   Object.keys(SUBCAT_LABELS).forEach(k=>{groups[k]={key:k,total:0,sold:0,buy:0,sale:0,profit:0};});
   items.filter(p=>p.category==='clock').forEach(p=>{
-    const sub=getSubcategory(p.name)||'—';
+    const sub=getSubcategory(p.name,p.img)||'—';
     if(!groups[sub])groups[sub]={key:sub,total:0,sold:0,buy:0,sale:0,profit:0};
     const c=compute(p);
     groups[sub].total++;

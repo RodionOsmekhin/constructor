@@ -36,8 +36,10 @@ const APP_KEY = 'constructor-secret-2026';
 
 const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
+const ADSPEND_SHEET = 'adspend';
 const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty','shipMethod','shipManual'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
+const ADSPEND_FIELDS = ['id','date','amount','comment'];
 
 function checkKey(e) {
   const key = (e.parameter && e.parameter.key) || '';
@@ -47,7 +49,7 @@ function checkKey(e) {
 function doGet(e) {
   if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
   const data = readAll();
-  return jsonOut({ok: true, items: data.items, settings: data.settings});
+  return jsonOut({ok: true, items: data.items, settings: data.settings, ads: data.ads});
 }
 
 function doPost(e) {
@@ -64,6 +66,27 @@ function doPost(e) {
 
     if (payload.type === 'settings') {
       writeSettings(payload.data || {});
+      return jsonOut({ok: true});
+    }
+
+    if (payload.type === 'adspend') {
+      const adSheet = getSheet(ADSPEND_SHEET, ADSPEND_FIELDS);
+      if (payload.action === 'add') {
+        adSheet.appendRow(ADSPEND_FIELDS.map(f => cellVal(payload.data[f])));
+      } else if (payload.action === 'update') {
+        const rowIndex = findRowById(adSheet, payload.data.id);
+        if (rowIndex > -1) {
+          adSheet.getRange(rowIndex, 1, 1, ADSPEND_FIELDS.length)
+            .setValues([ADSPEND_FIELDS.map(f => cellVal(payload.data[f]))]);
+        } else {
+          adSheet.appendRow(ADSPEND_FIELDS.map(f => cellVal(payload.data[f])));
+        }
+      } else if (payload.action === 'delete') {
+        const rowIndex = findRowById(adSheet, payload.id);
+        if (rowIndex > -1) adSheet.deleteRow(rowIndex);
+      } else {
+        return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
+      }
       return jsonOut({ok: true});
     }
 
@@ -166,5 +189,16 @@ function readAll() {
     settings = {};
     SETTINGS_FIELDS.forEach((f, i) => { settings[f] = cellToString(setRows[1][i]); });
   }
-  return {items: items, settings: settings};
+
+  const adSh = getSheet(ADSPEND_SHEET, ADSPEND_FIELDS);
+  const adRows = adSh.getDataRange().getValues();
+  const ads = adRows.slice(1)
+    .filter(r => r.some(c => c !== '' && c !== null))
+    .map(r => {
+      const o = {};
+      ADSPEND_FIELDS.forEach((f, i) => { o[f] = cellToString(r[i]); });
+      return o;
+    });
+
+  return {items: items, settings: settings, ads: ads};
 }

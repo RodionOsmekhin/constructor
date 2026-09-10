@@ -156,6 +156,7 @@
      закупку/продажу и т.п. с первого взгляда */
   #statsBody td:nth-child(2),#statsFoot td:nth-child(2){color:var(--red)}
   #statsBody td:nth-child(3),#statsFoot td:nth-child(3){color:var(--green)}
+  #statsBody td:nth-child(4),#statsFoot td:nth-child(4){color:var(--gold)}
   #statsSubcatBody td:nth-child(3),#statsSubcatFoot td:nth-child(3){color:var(--gold)}
   #statsSubcatBody td:nth-child(4),#statsSubcatFoot td:nth-child(4){color:var(--red)}
   #statsSubcatBody td:nth-child(5),#statsSubcatFoot td:nth-child(5){color:var(--green)}
@@ -191,6 +192,7 @@
     .topbar{display:none}
     .mobile-only{display:flex}
     .grid{grid-template-columns:1fr;gap:8px}
+    .set-card-actions{flex-direction:column}
 
     .card{flex-direction:row;border-radius:12px;align-items:stretch}
     .card .thumb{aspect-ratio:auto;width:78px;height:78px;flex-shrink:0}
@@ -250,8 +252,9 @@
 <main class="wrap">
   <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
   <div class="settings" id="settings">
-    <div class="set-card" style="display:flex;align-items:flex-end">
+    <div class="set-card set-card-actions" style="display:flex;align-items:flex-end;gap:8px">
       <button class="btn btn-primary" style="width:100%" onclick="openModal()">+ Добавить товар</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="openAdModal()">📣 Добавить рекламу</button>
     </div>
     <div class="set-card">
       <label>Коэффициент доставки</label>
@@ -274,7 +277,7 @@
   <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
   <div class="stats-panel" id="statsPanel">
     <table class="stats-table">
-      <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Прибыль</th></tr></thead>
+      <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Реклама</th><th>Прибыль</th></tr></thead>
       <tbody id="statsBody"></tbody>
       <tfoot id="statsFoot"></tfoot>
     </table>
@@ -424,9 +427,47 @@
   </div>
 </div>
 
+<div class="overlay" id="adOverlay">
+  <div class="modal">
+    <div class="mhead"><h2>Расходы на рекламу</h2>
+      <button class="close-x" onclick="closeAdModal()">✕</button>
+    </div>
+    <div class="mbody">
+      <div class="field2">
+        <div class="field">
+          <label>Сумма <span class="req">*</span></label>
+          <input id="ad-amount" type="number" step="1" placeholder="0">
+          <div class="hint">в гривнах ₴</div>
+        </div>
+        <div class="field">
+          <label>Дата <span class="req">*</span></label>
+          <input id="ad-date" type="date" required>
+        </div>
+      </div>
+      <div class="field">
+        <label>Комментарий</label>
+        <input id="ad-comment" type="text" placeholder="Например: реклама в Instagram">
+      </div>
+      <div class="stats-section-title" style="margin-top:6px">Уже внесено</div>
+      <table class="stats-table">
+        <thead><tr><th>Дата</th><th>Сумма</th><th></th></tr></thead>
+        <tbody id="adListBody"></tbody>
+      </table>
+      <div class="stats-empty" id="adListEmpty" style="display:none">Пока нет расходов на рекламу</div>
+    </div>
+    <div class="mfoot">
+      <button class="btn btn-ghost" onclick="closeAdModal()">Закрыть</button>
+      <button class="btn btn-primary" onclick="saveAd()">Добавить</button>
+    </div>
+  </div>
+</div>
+
 <script>
-const LS_ITEMS='constructor_items', LS_SET='constructor_settings';
+const LS_ITEMS='constructor_items', LS_SET='constructor_settings', LS_ADS='constructor_ads';
 let items=[], editId=null;
+let ads=[]; // расходы на рекламу: [{id,date,amount}]
+function loadAds(){ads=JSON.parse(localStorage.getItem(LS_ADS)||'[]');}
+function persistAdsLocal(){localStorage.setItem(LS_ADS,JSON.stringify(ads));}
 
 // категория — просто фильтр отображения (как раньше делали кнопки
 // «Часы»/«Конструктор»), а не отдельный набор данных:
@@ -504,7 +545,8 @@ async function loadFromSheet(){
       document.getElementById('s-cny').value=s.cny;
       document.getElementById('s-uah').value=s.uah;
       localStorage.setItem(LS_SET,JSON.stringify(s));}
-    persistLocal();render();
+    if(Array.isArray(data.ads))ads=data.ads.map(a=>({id:a.id,date:normalizeDate(a.date),amount:a.amount,comment:a.comment||''})).reverse();
+    persistLocal();persistAdsLocal();render();
     setSyncStatus('saved');
     return true;
   }catch(err){
@@ -622,7 +664,8 @@ function render(){
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
           <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка в ₴':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
-          ${(p.buyDate||p.saleDate)?`<div class="r"><span>Купл. · продано</span><b>${fmtDate(p.buyDate)||'—'} · ${fmtDate(p.saleDate)||'—'}</b></div>`:''}
+          ${p.buyDate?`<div class="r"><span>Дата покупки</span><b>${fmtDate(p.buyDate)}</b></div>`:''}
+          ${p.saleDate?`<div class="r"><span>Дата продажи</span><b>${fmtDate(p.saleDate)}</b></div>`:''}
         </div>
         <div class="price-block">
           <div class="buy-uah">${fmt(c.buyUAH,' ₴')}</div>
@@ -814,6 +857,8 @@ function recalc(){
 function clearFieldInvalid(){document.querySelectorAll('.overlay .invalid').forEach(el=>el.classList.remove('invalid'));}
 document.getElementById('overlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
 document.getElementById('overlay').addEventListener('change',e=>e.target.classList.remove('invalid'));
+document.getElementById('adOverlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
+document.getElementById('adOverlay').addEventListener('click',e=>{if(e.target.id==='adOverlay')closeAdModal();});
 async function saveProduct(){
   // проверка обязательных полей — карточка не должна создаваться/сохраняться,
   // если хоть одно из них не заполнено
@@ -892,6 +937,71 @@ async function delItem(id){
     persistLocal();render();
     setSyncStatus('error');
     alert('Не удалось удалить товар в таблице: '+err.message+'\nПопробуйте ещё раз.');
+  }
+}
+
+// --- расходы на рекламу ---
+function openAdModal(){
+  document.getElementById('ad-amount').value='';
+  document.getElementById('ad-date').value=todayISO();
+  document.getElementById('ad-comment').value='';
+  renderAdList();
+  document.getElementById('adOverlay').classList.add('open');
+}
+function closeAdModal(){document.getElementById('adOverlay').classList.remove('open');}
+function renderAdList(){
+  const tbody=document.getElementById('adListBody');
+  if(!tbody)return;
+  const sorted=[...ads].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  document.getElementById('adListEmpty').style.display=sorted.length?'none':'block';
+  tbody.innerHTML=sorted.map(a=>`<tr>
+    <td>${fmtDate(a.date)||'—'}</td>
+    <td>${fmt(parseFloat(a.amount)||0,' ₴')}</td>
+    <td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="deleteAd('${a.id}')">✕</button></td>
+  </tr>`).join('');
+}
+async function saveAd(){
+  const amountVal=document.getElementById('ad-amount').value;
+  const dateVal=document.getElementById('ad-date').value;
+  const invalidIds=[];
+  if(amountVal===''||isNaN(parseFloat(amountVal)))invalidIds.push('ad-amount');
+  if(!dateVal)invalidIds.push('ad-date');
+  if(invalidIds.length){
+    invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
+    return;
+  }
+  const rec={id:'ad'+uid(),date:dateVal,amount:amountVal,comment:document.getElementById('ad-comment').value.trim()};
+  ads.unshift(rec);
+  persistAdsLocal();render();renderAdList();
+  document.getElementById('ad-amount').value='';
+  document.getElementById('ad-comment').value='';
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'adspend',action:'add',data:rec});
+    setSyncStatus('saved');
+  }catch(err){
+    ads=ads.filter(a=>a.id!==rec.id);
+    persistAdsLocal();render();renderAdList();
+    setSyncStatus('error');
+    alert('Не удалось сохранить расход на рекламу в таблице: '+err.message+'\nПопробуйте ещё раз.');
+  }
+}
+async function deleteAd(id){
+  if(!confirm('Удалить эту запись о расходе на рекламу?'))return;
+  const idx=ads.findIndex(a=>a.id===id);
+  if(idx===-1)return;
+  const removed=ads[idx];
+  ads=ads.filter(a=>a.id!==id);
+  persistAdsLocal();render();renderAdList();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'adspend',action:'delete',id});
+    setSyncStatus('saved');
+  }catch(err){
+    ads.splice(idx,0,removed);
+    persistAdsLocal();render();renderAdList();
+    setSyncStatus('error');
+    alert('Не удалось удалить расход на рекламу в таблице: '+err.message+'\nПопробуйте ещё раз.');
   }
 }
 // --- сохранение напрямую в папку (File System Access API) ---
@@ -1013,10 +1123,11 @@ function groupKey(name){
 }
 // сортировка таблицы "Остатки" по клику на заголовок Кол-во/Продано/Остаток —
 // повторный клик по тому же заголовку переключает направление (возрастание/убывание)
-let stockSort={col:null,dir:1};
+let stockSort={col:null,dir:-1};
 function setStockSort(col){
+  // первый клик по новой колонке — сортировка от большего к меньшему
   if(stockSort.col===col)stockSort.dir=-stockSort.dir;
-  else{stockSort.col=col;stockSort.dir=1;}
+  else{stockSort.col=col;stockSort.dir=-1;}
   renderStock();
 }
 function updateStockSortArrows(){
@@ -1186,32 +1297,39 @@ function renderSubcatStats(){
 function renderStats(){
   renderStock();
   renderSubcatStats();
-  const spend={},income={};
+  const spend={},income={},adSpend={};
   visibleItems().forEach(p=>{
     const c=compute(p);
     if(p.buyDate){const k=p.buyDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;}
     if(p.saleDate){const k=p.saleDate.slice(0,7);income[k]=(income[k]||0)+c.saleUAH;}
   });
-  const months=Array.from(new Set([...Object.keys(spend),...Object.keys(income)])).sort();
+  // расходы на рекламу — общие для всего магазина, не привязаны к категории
+  ads.forEach(a=>{
+    if(!a.date)return;
+    const k=a.date.slice(0,7);
+    adSpend[k]=(adSpend[k]||0)+(parseFloat(a.amount)||0);
+  });
+  const months=Array.from(new Set([...Object.keys(spend),...Object.keys(income),...Object.keys(adSpend)])).sort();
   const body=document.getElementById('statsBody'), foot=document.getElementById('statsFoot');
   document.getElementById('statsEmpty').style.display=months.length?'none':'block';
-  let tSpend=0,tIncome=0;
+  let tSpend=0,tIncome=0,tAds=0;
   body.innerHTML=months.map(k=>{
-    const sp=spend[k]||0, inc=income[k]||0, pr=inc-sp;
-    tSpend+=sp;tIncome+=inc;
+    const sp=spend[k]||0, inc=income[k]||0, ad=adSpend[k]||0, pr=inc-sp-ad;
+    tSpend+=sp;tIncome+=inc;tAds+=ad;
     const pc=pr>=0?'pos':'neg';
-    return`<tr><td>${monthLabel(k)}</td><td>${fmt(sp,' ₴')}</td><td>${fmt(inc,' ₴')}</td>
+    return`<tr><td>${monthLabel(k)}</td><td>${fmt(sp,' ₴')}</td><td>${fmt(inc,' ₴')}</td><td>${fmt(ad,' ₴')}</td>
       <td class="${pc}">${fmt(pr,' ₴')}</td></tr>`;
   }).join('');
-  const tp=tIncome-tSpend, tpc=tp>=0?'pos':'neg';
-  foot.innerHTML=months.length?`<tr><td>Итого</td><td>${fmt(tSpend,' ₴')}</td><td>${fmt(tIncome,' ₴')}</td>
+  const tp=tIncome-tSpend-tAds, tpc=tp>=0?'pos':'neg';
+  foot.innerHTML=months.length?`<tr><td>Итого</td><td>${fmt(tSpend,' ₴')}</td><td>${fmt(tIncome,' ₴')}</td><td>${fmt(tAds,' ₴')}</td>
     <td class="${tpc}">${fmt(tp,' ₴')}</td></tr>`:'';
 
-  // график по месяцам (закупка / продажа / прибыль) — аналогично index2
+  // график по месяцам (закупка / продажа / реклама / прибыль) — аналогично index2
   const labels=months.length?months.map(monthLabel):['Нет данных'];
   const spendData=months.map(k=>spend[k]||0);
   const incomeData=months.map(k=>income[k]||0);
-  const profitData=months.map(k=>(income[k]||0)-(spend[k]||0));
+  const adData=months.map(k=>adSpend[k]||0);
+  const profitData=months.map(k=>(income[k]||0)-(spend[k]||0)-(adSpend[k]||0));
   const ctx=document.getElementById('chartMonthly').getContext('2d');
   if(statsChart)statsChart.destroy();
   statsChart=new Chart(ctx,{
@@ -1221,7 +1339,8 @@ function renderStats(){
       datasets:[
         {label:'Траты',data:spendData,backgroundColor:'#ff5d6c'},
         {label:'Доход',data:incomeData,backgroundColor:'#2fbf71'},
-        {label:'Прибыль',data:profitData,type:'line',borderColor:'#ffbf47',backgroundColor:'#ffbf47',tension:.3}
+        {label:'Реклама',data:adData,backgroundColor:'#ffbf47'},
+        {label:'Прибыль',data:profitData,type:'line',borderColor:'#4f8cff',backgroundColor:'#4f8cff',tension:.3}
       ]
     },
     options:{
@@ -1237,7 +1356,7 @@ function renderStats(){
 }
 
 document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===currentCategory));
-loadSettings();loadItems();render();
+loadSettings();loadItems();loadAds();render();
 loadFromSheet();
 </script>
 </body>

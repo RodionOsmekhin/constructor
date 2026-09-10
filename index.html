@@ -192,7 +192,6 @@
     .topbar{display:none}
     .mobile-only{display:flex}
     .grid{grid-template-columns:1fr;gap:8px}
-    .set-card-actions{flex-direction:column}
 
     .card{flex-direction:row;border-radius:12px;align-items:stretch}
     .card .thumb{aspect-ratio:auto;width:78px;height:78px;flex-shrink:0}
@@ -252,8 +251,8 @@
 <main class="wrap">
   <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
   <div class="settings" id="settings">
-    <div class="set-card set-card-actions" style="display:flex;align-items:flex-end;gap:8px">
-      <button class="btn btn-primary" style="width:100%" onclick="openModal()">+ Добавить товар</button>
+    <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+      <button class="btn btn-primary" style="width:100%" onclick="openModal()">📦 Добавить товар</button>
       <button class="btn btn-ghost" style="width:100%" onclick="openAdModal()">📣 Добавить рекламу</button>
     </div>
     <div class="set-card">

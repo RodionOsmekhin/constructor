@@ -37,9 +37,13 @@ const APP_KEY = 'constructor-secret-2026';
 const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
 const ADSPEND_SHEET = 'adspend';
-const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty','shipMethod','shipManual'];
+const CATALOG_SHEET = 'catalog';
+const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty','shipMethod','shipManual','subcategory'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
 const ADSPEND_FIELDS = ['id','date','amount','comment'];
+// товары-шаблоны (название+фото) для подкатегорий, которые пользователь
+// создаёт через окно "🏷️ Подкатегории" в приложении
+const CATALOG_FIELDS = ['id','subcategory','name','img'];
 
 function checkKey(e) {
   const key = (e.parameter && e.parameter.key) || '';
@@ -49,7 +53,7 @@ function checkKey(e) {
 function doGet(e) {
   if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
   const data = readAll();
-  return jsonOut({ok: true, items: data.items, settings: data.settings, ads: data.ads});
+  return jsonOut({ok: true, items: data.items, settings: data.settings, ads: data.ads, catalog: data.catalog});
 }
 
 function doPost(e) {
@@ -84,6 +88,27 @@ function doPost(e) {
       } else if (payload.action === 'delete') {
         const rowIndex = findRowById(adSheet, payload.id);
         if (rowIndex > -1) adSheet.deleteRow(rowIndex);
+      } else {
+        return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
+      }
+      return jsonOut({ok: true});
+    }
+
+    if (payload.type === 'catalog') {
+      const catSheet = getSheet(CATALOG_SHEET, CATALOG_FIELDS);
+      if (payload.action === 'add') {
+        catSheet.appendRow(CATALOG_FIELDS.map(f => cellVal(payload.data[f])));
+      } else if (payload.action === 'update') {
+        const rowIndex = findRowById(catSheet, payload.data.id);
+        if (rowIndex > -1) {
+          catSheet.getRange(rowIndex, 1, 1, CATALOG_FIELDS.length)
+            .setValues([CATALOG_FIELDS.map(f => cellVal(payload.data[f]))]);
+        } else {
+          catSheet.appendRow(CATALOG_FIELDS.map(f => cellVal(payload.data[f])));
+        }
+      } else if (payload.action === 'delete') {
+        const rowIndex = findRowById(catSheet, payload.id);
+        if (rowIndex > -1) catSheet.deleteRow(rowIndex);
       } else {
         return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
       }
@@ -200,5 +225,15 @@ function readAll() {
       return o;
     });
 
-  return {items: items, settings: settings, ads: ads};
+  const catSh = getSheet(CATALOG_SHEET, CATALOG_FIELDS);
+  const catRows = catSh.getDataRange().getValues();
+  const catalog = catRows.slice(1)
+    .filter(r => r.some(c => c !== '' && c !== null))
+    .map(r => {
+      const o = {};
+      CATALOG_FIELDS.forEach((f, i) => { o[f] = cellToString(r[i]); });
+      return o;
+    });
+
+  return {items: items, settings: settings, ads: ads, catalog: catalog};
 }

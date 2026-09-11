@@ -142,6 +142,10 @@
   .cat-tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);
     border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
   .cat-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .subcat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 16px}
+  .subcat-tab{border:1px solid var(--line);background:transparent;color:var(--muted);
+    border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
+  .subcat-tab.active{background:var(--panel2);border-color:var(--accent);color:var(--accent)}
   .stats-panel{display:none;background:var(--panel);border:1px solid var(--line);
     border-radius:12px;padding:14px 16px;margin-bottom:16px}
   .stats-panel.open{display:block}
@@ -318,6 +322,7 @@
     <button class="cat-tab" data-cat="clock" onclick="setCategory('clock')">🕒 Часы</button>
     <button class="cat-tab" data-cat="constructor1" onclick="setCategory('constructor1')">🧱 Конструктор</button>
   </div>
+  <div class="subcat-tabs" id="subcatTabs" style="display:none"></div>
   <div id="grid" class="grid"></div>
   <div id="empty" class="empty" style="display:none">
     <h2>Пока нет товаров</h2>
@@ -528,14 +533,39 @@ function persistCatalogLocal(){localStorage.setItem(LS_CATALOG,JSON.stringify(na
 // товары всех категорий лежат в одной общей таблице.
 const LS_CATEGORY='constructor_category';
 let currentCategory=localStorage.getItem(LS_CATEGORY)||'';
+// доп. фильтр по подкатегории внутри «Часы» — товаров становится много, и
+// без него неудобно искать конкретную подкатегорию среди остальных
+const LS_SUBCAT_FILTER='constructor_subcat_filter';
+let currentSubcategoryFilter=localStorage.getItem(LS_SUBCAT_FILTER)||'';
 function setCategory(cat){
   currentCategory=cat;
   localStorage.setItem(LS_CATEGORY,cat);
   document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   render();
 }
+function setSubcategoryFilter(sub){
+  currentSubcategoryFilter=sub;
+  localStorage.setItem(LS_SUBCAT_FILTER,sub);
+  render();
+}
+// строка кнопок-фильтров по подкатегории — показывается только на вкладке
+// «Часы», и только если подкатегорий больше одной (иначе фильтровать нечего)
+function renderSubcatTabs(){
+  const wrap=document.getElementById('subcatTabs');
+  if(currentCategory!=='clock'){wrap.style.display='none';return;}
+  const hasOther=items.some(p=>p.category==='clock'&&!(p.subcategory||getSubcategory(p.name,p.img)));
+  const opts=[{value:'',label:'Все'}].concat(CLOCK_SUBCATEGORIES.map(s=>({value:s.value,label:s.label})));
+  if(hasOther)opts.push({value:'clock-other',label:'🕒 Другое'});
+  if(opts.length<=2){wrap.style.display='none';return;}
+  wrap.style.display='flex';
+  wrap.innerHTML=opts.map(o=>`<button class="subcat-tab${currentSubcategoryFilter===o.value?' active':''}"
+    onclick="setSubcategoryFilter('${o.value}')">${o.label}</button>`).join('');
+}
 function visibleItems(){
-  const list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
+  let list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
+  if(currentCategory==='clock'&&currentSubcategoryFilter){
+    list=list.filter(p=>(p.subcategory||getSubcategory(p.name,p.img)||'clock-other')===currentSubcategoryFilter);
+  }
   // непроданные — сверху, проданные (есть дата продажи) — снизу;
   // порядок внутри каждой группы не меняется
   return [...list].sort((a,b)=>(a.saleDate?1:0)-(b.saleDate?1:0));
@@ -699,6 +729,7 @@ function imgFallback(img,onFail){
 
 function render(){
   syncSubcategoriesFromItems();
+  renderSubcatTabs();
   const grid=document.getElementById('grid');
   const list=visibleItems();
   document.getElementById('empty').style.display=list.length?'none':'block';

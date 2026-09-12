@@ -535,15 +535,25 @@ let currentCategory=localStorage.getItem(LS_CATEGORY)||'';
 // без него неудобно искать конкретную подкатегорию среди остальных
 const LS_SUBCAT_FILTER='constructor_subcat_filter';
 let currentSubcategoryFilter=localStorage.getItem(LS_SUBCAT_FILTER)||'';
+// повторный клик на уже выбранную подкатегорию переключает порядок — сначала
+// проданные (самые новые продажи сверху), а не непроданные; ещё раз клик —
+// обратно к обычному порядку. Сбрасывается при выборе другой подкатегории.
+let showSoldFirst=false;
 function setCategory(cat){
   currentCategory=cat;
   localStorage.setItem(LS_CATEGORY,cat);
+  showSoldFirst=false;
   document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
   render();
 }
 function setSubcategoryFilter(sub){
-  currentSubcategoryFilter=sub;
-  localStorage.setItem(LS_SUBCAT_FILTER,sub);
+  if(sub===currentSubcategoryFilter){
+    showSoldFirst=!showSoldFirst;
+  }else{
+    currentSubcategoryFilter=sub;
+    showSoldFirst=false;
+    localStorage.setItem(LS_SUBCAT_FILTER,sub);
+  }
   render();
 }
 // строка кнопок-фильтров по подкатегории — показывается только на вкладке
@@ -556,8 +566,11 @@ function renderSubcatTabs(){
   if(hasOther)opts.push({value:'clock-other',label:'🕒 Другое'});
   if(opts.length<=2){wrap.style.display='none';return;}
   wrap.style.display='flex';
-  wrap.innerHTML=opts.map(o=>`<button class="subcat-tab${currentSubcategoryFilter===o.value?' active':''}"
-    onclick="setSubcategoryFilter('${o.value}')">${o.label}</button>`).join('');
+  wrap.innerHTML=opts.map(o=>{
+    const isActive=currentSubcategoryFilter===o.value;
+    const label=isActive&&showSoldFirst?o.label+' • ↑':o.label;
+    return `<button class="subcat-tab${isActive?' active':''}" onclick="setSubcategoryFilter('${o.value}')">${label}</button>`;
+  }).join('');
 }
 function visibleItems(){
   let list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
@@ -565,10 +578,12 @@ function visibleItems(){
     list=list.filter(p=>(p.subcategory||'clock-other')===currentSubcategoryFilter);
   }
   // непроданные — сверху (порядок между собой не меняется), проданные —
-  // снизу, но среди них самих сортируем по дате продажи: новые сверху
+  // снизу, но среди них самих сортируем по дате продажи: новые сверху.
+  // Повторный клик на активную подкатегорию (showSoldFirst) переворачивает
+  // эти две группы местами — проданные наверх.
   return [...list].sort((a,b)=>{
     const as=!!a.saleDate, bs=!!b.saleDate;
-    if(as!==bs)return as?1:-1;
+    if(as!==bs)return(as?1:-1)*(showSoldFirst?-1:1);
     if(as&&bs)return (b.saleDate||'').localeCompare(a.saleDate||'');
     return 0;
   });

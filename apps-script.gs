@@ -38,7 +38,10 @@ const ITEMS_SHEET = 'items';
 const SETTINGS_SHEET = 'settings';
 const ADSPEND_SHEET = 'adspend';
 const CATALOG_SHEET = 'catalog';
-const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty','shipMethod','shipManual','subcategory'];
+// rateCny/rateUah — курс юаня и доллара, зафиксированные на момент создания
+// товара (см. saveProduct в index.html), чтобы дальнейшие изменения курсов
+// в настройках не меняли задним числом стоимость уже созданных товаров
+const ITEM_FIELDS = ['id','img','name','item','weight','coeff','sale','buyDate','saleDate','comment','category','qty','shipMethod','shipManual','subcategory','rateCny','rateUah'];
 const SETTINGS_FIELDS = ['coeff','cny','uah'];
 const ADSPEND_FIELDS = ['id','date','amount','comment'];
 // товары-шаблоны (название+фото) для подкатегорий, которые пользователь

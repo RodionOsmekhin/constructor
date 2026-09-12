@@ -333,7 +333,6 @@
 <div class="footer">
   <div class="wrap">
     <div class="stat"><span class="k">Товаров</span><span class="v" id="t-count">0</span></div>
-    <div class="stat"><span class="k">Вес</span><span class="v" id="t-weight">0 кг</span></div>
     <div class="stat"><span class="k">Закупка</span><span class="v" id="t-item">0 ₴</span><span class="usd" id="t-item-usd">0 $</span></div>
     <div class="stat"><span class="k">Доставка</span><span class="v" id="t-ship">0 ₴</span><span class="usd" id="t-ship-usd">0 $</span></div>
     <div class="stat"><span class="k">Итоговая цена</span><span class="v" style="color:var(--uah)" id="t-buy">0 ₴</span><span class="usd" id="t-buy-usd">0 $</span></div>
@@ -565,9 +564,14 @@ function visibleItems(){
   if(currentCategory==='clock'&&currentSubcategoryFilter){
     list=list.filter(p=>(p.subcategory||'clock-other')===currentSubcategoryFilter);
   }
-  // непроданные — сверху, проданные (есть дата продажи) — снизу;
-  // порядок внутри каждой группы не меняется
-  return [...list].sort((a,b)=>(a.saleDate?1:0)-(b.saleDate?1:0));
+  // непроданные — сверху (порядок между собой не меняется), проданные —
+  // снизу, но среди них самих сортируем по дате продажи: новые сверху
+  return [...list].sort((a,b)=>{
+    const as=!!a.saleDate, bs=!!b.saleDate;
+    if(as!==bs)return as?1:-1;
+    if(as&&bs)return (b.saleDate||'').localeCompare(a.saleDate||'');
+    return 0;
+  });
 }
 
 // --- Google Таблица как общее хранилище (механизм как в triops_uchet) ---
@@ -671,17 +675,25 @@ function loadItems(){items=normalizeItemDates(JSON.parse(localStorage.getItem(LS
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
 
 // core calculation
+// курс юаня/доллара и коэффициент доставки берём из самого товара, если они
+// там уже зафиксированы (rateCny/rateUah/coeff — записываются один раз при
+// создании товара, см. saveProduct), и только для старых товаров без этих
+// полей — из текущих глобальных настроек. Так стоимость уже созданных
+// товаров не "уезжает" задним числом при изменении курсов/коэффициента в
+// настройках — они влияют только на новые товары.
 function compute(p){
   const s=settings();
+  const cny=(p.rateCny!=null&&p.rateCny!=='')?parseFloat(p.rateCny):s.cny;
+  const uah=(p.rateUah!=null&&p.rateUah!=='')?parseFloat(p.rateUah):s.uah;
   const coeff=(p.coeff!=null&&p.coeff!=='')?parseFloat(p.coeff):s.coeff;
-  const itemUAH=(parseFloat(p.item)||0)*s.cny;      // ¥ → ₴ напрямую
+  const itemUAH=(parseFloat(p.item)||0)*cny;      // ¥ → ₴ напрямую
   // если доставка указана вручную в гривнах — используем её напрямую,
   // вес и коэффициент в этом случае не учитываются
   const manualShip=(p.shipManual!=null&&p.shipManual!=='')?parseFloat(p.shipManual):null;
-  const shipUSD=manualShip!=null?(s.uah>0?manualShip/s.uah:0):(parseFloat(p.weight)||0)*coeff;    // вес × коэф. в $
-  const shipUAH=manualShip!=null?manualShip:shipUSD*s.uah;                       // доставка $ → ₴
+  const shipUSD=manualShip!=null?(uah>0?manualShip/uah:0):(parseFloat(p.weight)||0)*coeff;    // вес × коэф. в $
+  const shipUAH=manualShip!=null?manualShip:shipUSD*uah;                       // доставка $ → ₴
   const buyUAH=itemUAH+shipUAH;
-  const buyUSD=s.uah>0?buyUAH/s.uah:0;
+  const buyUSD=uah>0?buyUAH/uah:0;
   const saleUAH=parseFloat(p.sale)||0;
   const profit=saleUAH-buyUAH;
   const margin=buyUAH>0?profit/buyUAH*100:0;
@@ -733,11 +745,11 @@ function render(){
   const list=visibleItems();
   document.getElementById('empty').style.display=list.length?'none':'block';
   grid.innerHTML='';
-  let tBuy=0,tSale=0,tProfit=0,mSum=0,mN=0,tWeight=0,tShip=0,tItem=0;
+  let tBuy=0,tSale=0,tProfit=0,mSum=0,mN=0,tShip=0,tItem=0;
   list.forEach(p=>{
     const c=compute(p);
     tBuy+=c.buyUAH;tSale+=c.saleUAH;tProfit+=c.profit;
-    tWeight+=parseFloat(p.weight)||0;tShip+=c.shipUAH;tItem+=c.itemUAH;
+    tShip+=c.shipUAH;tItem+=c.itemUAH;
     if(c.buyUAH>0){mSum+=c.margin;mN++;}
     const pc=c.profit>=0?'pos':'neg';
     const isSold=!!p.saleDate;
@@ -769,7 +781,6 @@ function render(){
     grid.appendChild(card);
   });
   document.getElementById('t-count').textContent=list.length;
-  document.getElementById('t-weight').textContent=new Intl.NumberFormat('ru-RU',{maximumFractionDigits:2}).format(tWeight)+' кг';
   const rate=settings().uah||1, toUsd=v=>fmt(v/rate,' $');
   document.getElementById('t-item').textContent=fmt(tItem,' ₴');
   document.getElementById('t-item-usd').textContent=toUsd(tItem);
@@ -814,7 +825,11 @@ function toggleWeightRequired(){
   document.getElementById('shipmanual-req').style.display=hasWeight?'none':'inline';
   document.getElementById('weight-hint').textContent=hasManual?'в кг · не обязательно, указана доставка напрямую':'в кг';
 }
-function openModal(){editId=null;document.getElementById('modal-title').textContent='Новый товар';
+// пока форма открыта на редактировании существующего товара — храним его уже
+// зафиксированные курсы, чтобы предпросмотр стоимости в самой форме тоже
+// показывал их, а не текущие (возможно, уже другие) курсы из настроек
+let editingItemRates=null;
+function openModal(){editId=null;editingItemRates=null;document.getElementById('modal-title').textContent='Новый товар';
   ['f-img','f-name','f-item','f-weight','f-coeff','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
   // дата покупки — обязательное поле, по умолчанию сегодняшняя дата
   document.getElementById('f-buydate').value=todayISO();
@@ -826,6 +841,7 @@ function openModal(){editId=null;document.getElementById('modal-title').textCont
   updateNameSuggestions();toggleWeightRequired();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
+  editingItemRates={rateCny:p.rateCny,rateUah:p.rateUah};
   document.getElementById('modal-title').textContent='Изменить товар';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
@@ -1108,7 +1124,11 @@ function recalc(){
   const p={img:document.getElementById('f-img').value,item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,coeff:document.getElementById('f-coeff').value,
     shipManual:document.getElementById('f-shipmanual').value,
-    sale:document.getElementById('f-sale').value};
+    sale:document.getElementById('f-sale').value,
+    // при редактировании существующего товара показываем предпросмотр по
+    // ЕГО уже зафиксированным курсам, а не по текущим настройкам
+    rateCny:editingItemRates?editingItemRates.rateCny:undefined,
+    rateUah:editingItemRates?editingItemRates.rateUah:undefined};
   const c=compute(p);
   document.getElementById('c-item').textContent=fmt(c.itemUAH,' ₴');
   document.getElementById('c-ship').textContent=fmt(c.shipUAH,' ₴');
@@ -1161,6 +1181,17 @@ async function saveProduct(){
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,
     comment:document.getElementById('f-comment').value.trim()};
+  // курс юаня/доллара и (если не указан вручную) коэффициент доставки
+  // фиксируем ОДИН РАЗ — в момент создания товара — текущими значениями из
+  // настроек. При редактировании уже существующего товара эти поля не
+  // трогаем (ниже они просто не включены в p), поэтому дальнейшие правки
+  // настроек курсов/коэффициента больше не меняют стоимость этого товара.
+  if(!editId){
+    const s=settings();
+    if(p.coeff==='')p.coeff=String(s.coeff);
+    p.rateCny=s.cny;
+    p.rateUah=s.uah;
+  }
   const wasEditing=!!editId;
   let prevIdx=-1, prevItem=null, rec;
   if(wasEditing){

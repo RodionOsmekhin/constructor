@@ -227,6 +227,11 @@
     .card .actions .btn{flex:none;padding:5px 9px;font-size:11px;min-width:0;white-space:nowrap}
 
     .field2{grid-template-columns:1fr 1fr}
+    .set-card-io{grid-column:1/-1;flex-direction:row}
+    .set-card-io .btn{width:auto;flex:1}
+    .settings{row-gap:6px;padding:6px 0 8px}
+    .settings-toggle{margin-bottom:6px}
+    .stats-toggle{margin-top:6px}
     body{padding-bottom:120px}
 
     .stats-table{font-size:11px}
@@ -265,18 +270,18 @@
       <button class="btn btn-ghost" style="width:100%" onclick="openSubcatModal()">🏷️ Подкатегории</button>
     </div>
     <div class="set-card">
-      <label>Коэффициент доставки</label>
-      <div class="inp"><input id="s-coeff" type="number" step="0.1" value="6.4"><span class="unit">$ / кг</span></div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <div>
+          <label>Курс юаня</label>
+          <div class="inp"><input id="s-cny" type="number" step="0.01" value="6.8"><span class="unit">₴ за 1 ¥</span></div>
+        </div>
+        <div>
+          <label>Курс гривны</label>
+          <div class="inp"><input id="s-uah" type="number" step="0.1" value="45"><span class="unit">₴ за 1 $</span></div>
+        </div>
+      </div>
     </div>
-    <div class="set-card">
-      <label>Курс юаня</label>
-      <div class="inp"><input id="s-cny" type="number" step="0.01" value="6.8"><span class="unit">₴ за 1 ¥</span></div>
-    </div>
-    <div class="set-card">
-      <label>Курс гривны</label>
-      <div class="inp"><input id="s-uah" type="number" step="0.1" value="45"><span class="unit">₴ за 1 $</span></div>
-    </div>
-    <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+    <div class="set-card set-card-io" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
       <button class="btn btn-ghost" style="width:100%" onclick="exportData()">⇩ Экспорт данных</button>
       <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
       <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
@@ -377,34 +382,21 @@
           <option value="air">✈️ Авиа</option>
         </select>
       </div>
-      <div class="field2">
         <div class="field">
-          <label>Стоимость товара <span class="req">*</span></label>
+          <label>Стоимость товара в юанях ¥ <span class="req">*</span></label>
           <input id="f-item" type="number" step="0.01" placeholder="0" oninput="recalc()">
-          <div class="hint">в юанях ¥</div>
         </div>
         <div class="field">
-          <label>Вес <span class="req" id="weight-req">*</span></label>
-          <input id="f-weight" type="number" step="0.01" placeholder="0" oninput="recalc();toggleWeightRequired()">
-          <div class="hint" id="weight-hint">в кг</div>
+          <label>Вес в кг </label>
+          <input id="f-weight" type="number" step="0.01" placeholder="0" oninput="recalc()">
         </div>
-      </div>
-      <div class="field2">
-        <div class="field">
-          <label>Коэф. доставки</label>
-          <input id="f-coeff" type="number" step="0.1" placeholder="общий" oninput="recalc()">
-          <div class="hint">$ / кг · пусто = общий</div>
-        </div>
-        <div class="field">
-          <label>Цена продажи</label>
-          <input id="f-sale" type="number" step="1" placeholder="0" oninput="recalc()">
-          <div class="hint">в гривнах ₴</div>
-        </div>
+      <div class="field">
+        <label>Цена продажи в гривнах ₴ </label>
+        <input id="f-sale" type="number" step="1" placeholder="0" oninput="recalc()">
       </div>
       <div class="field">
-        <label>Доставка напрямую в гривнах <span class="req" id="shipmanual-req">*</span></label>
-        <input id="f-shipmanual" type="number" step="1" placeholder="0" oninput="recalc();toggleWeightRequired()">
-        <div class="hint">нужно указать либо Доставка напрямую либо вес</div>
+        <label>Доставка в гривнах ₴ <span class="req">*</span></label>
+        <input id="f-shipmanual" type="number" step="1" placeholder="0" oninput="recalc()">
       </div>
       <div class="field2">
         <div class="field">
@@ -422,7 +414,7 @@
       </div>
       <div class="calc-box" id="calc">
         <div class="cr"><span>Товар (¥ → ₴)</span><b id="c-item">0 ₴</b></div>
-        <div class="cr"><span>Доставка (вес × коэф. $ → ₴)</span><b id="c-ship">0 ₴</b></div>
+        <div class="cr"><span>Доставка ₴</span><b id="c-ship">0 ₴</b></div>
         <div class="cr total"><span>Закупка</span><b id="c-total">0 ₴</b></div>
         <div class="cr"><span>≈ в долларах</span><b id="c-total-usd">0 $</b></div>
         <div class="cr"><span>Прибыль / маржа</span><b id="c-profit">—</b></div>
@@ -643,7 +635,6 @@ async function loadFromSheet(){
     // добавления (без ожидания перезагрузки/обновления страницы)
     if(Array.isArray(data.items))items=normalizeItemDates(data.items).reverse();
     if(data.settings){const s=data.settings;
-      document.getElementById('s-coeff').value=s.coeff;
       document.getElementById('s-cny').value=s.cny;
       document.getElementById('s-uah').value=s.uah;
       localStorage.setItem(LS_SET,JSON.stringify(s));}
@@ -662,12 +653,10 @@ async function loadFromSheet(){
 
 function loadSettings(){
   const s=JSON.parse(localStorage.getItem(LS_SET)||'null');
-  if(s){document.getElementById('s-coeff').value=s.coeff;
-    document.getElementById('s-cny').value=s.cny;
+  if(s){document.getElementById('s-cny').value=s.cny;
     document.getElementById('s-uah').value=s.uah;}
 }
 function settings(){return{
-  coeff:parseFloat(document.getElementById('s-coeff').value)||0,
   cny:parseFloat(document.getElementById('s-cny').value)||1,
   uah:parseFloat(document.getElementById('s-uah').value)||1};}
 let settingsSyncTimer=null;
@@ -683,24 +672,27 @@ function saveSettings(){
     catch(err){setSyncStatus('error');console.error('Ошибка сохранения настроек:',err);}
   },600);
 }
-['s-coeff','s-cny','s-uah'].forEach(id=>
+['s-cny','s-uah'].forEach(id=>
   document.getElementById(id).addEventListener('input',saveSettings));
 
 function loadItems(){items=normalizeItemDates(JSON.parse(localStorage.getItem(LS_ITEMS)||'[]'));}
 function persistLocal(){localStorage.setItem(LS_ITEMS,JSON.stringify(items));}
 
 // core calculation
-// курс юаня/доллара и коэффициент доставки берём из самого товара, если они
-// там уже зафиксированы (rateCny/rateUah/coeff — записываются один раз при
-// создании товара, см. saveProduct), и только для старых товаров без этих
-// полей — из текущих глобальных настроек. Так стоимость уже созданных
-// товаров не "уезжает" задним числом при изменении курсов/коэффициента в
-// настройках — они влияют только на новые товары.
+// курс юаня/доллара берём из самого товара, если он там уже зафиксирован
+// (rateCny/rateUah — записываются один раз при создании товара, см.
+// saveProduct), и только для старых товаров без этих полей — из текущих
+// глобальных настроек. Так стоимость уже созданных товаров не "уезжает"
+// задним числом при изменении курсов в настройках — они влияют только на
+// новые товары. Коэффициент доставки как отдельная глобальная настройка
+// убран — доставка теперь всегда указывается вручную (shipManual); поле
+// coeff у товара оставлено только для того, чтобы по-старому считались
+// старые товары, у которых доставка ещё считалась по весу.
 function compute(p){
   const s=settings();
   const cny=(p.rateCny!=null&&p.rateCny!=='')?parseFloat(p.rateCny):s.cny;
   const uah=(p.rateUah!=null&&p.rateUah!=='')?parseFloat(p.rateUah):s.uah;
-  const coeff=(p.coeff!=null&&p.coeff!=='')?parseFloat(p.coeff):s.coeff;
+  const coeff=parseFloat(p.coeff)||0;
   const itemUAH=(parseFloat(p.item)||0)*cny;      // ¥ → ₴ напрямую
   // если доставка указана вручную в гривнах — используем её напрямую,
   // вес и коэффициент в этом случае не учитываются
@@ -830,22 +822,12 @@ window.addEventListener('orientationchange',()=>setTimeout(syncFooterPadding,150
 // modal
 function todayISO(){const d=new Date();const pad=n=>String(n).padStart(2,'0');
   return`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;}
-// нужно заполнить хотя бы одно из двух: либо вес (для расчёта доставки по
-// весу × коэффициенту), либо доставку напрямую в гривнах — как только одно
-// из полей заполнено, звёздочка-обязательность у второго снимается
-function toggleWeightRequired(){
-  const hasManual=!!document.getElementById('f-shipmanual').value;
-  const hasWeight=!!document.getElementById('f-weight').value;
-  document.getElementById('weight-req').style.display=hasManual?'none':'inline';
-  document.getElementById('shipmanual-req').style.display=hasWeight?'none':'inline';
-  document.getElementById('weight-hint').textContent=hasManual?'в кг · не обязательно, указана доставка напрямую':'в кг';
-}
 // пока форма открыта на редактировании существующего товара — храним его уже
 // зафиксированные курсы, чтобы предпросмотр стоимости в самой форме тоже
 // показывал их, а не текущие (возможно, уже другие) курсы из настроек
 let editingItemRates=null;
 function openModal(){editId=null;editingItemRates=null;document.getElementById('modal-title').textContent='Новый товар';
-  ['f-img','f-name','f-item','f-weight','f-coeff','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
+  ['f-img','f-name','f-item','f-weight','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
   // дата покупки — обязательное поле, по умолчанию сегодняшняя дата
   document.getElementById('f-buydate').value=todayISO();
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
@@ -853,10 +835,10 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-category').value=currentCategory;
   document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
-  updateNameSuggestions();toggleWeightRequired();
+  updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
-  editingItemRates={rateCny:p.rateCny,rateUah:p.rateUah};
+  editingItemRates={rateCny:p.rateCny,rateUah:p.rateUah,coeff:p.coeff};
   document.getElementById('modal-title').textContent='Изменить товар';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
@@ -865,13 +847,12 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-shipmethod').value=p.shipMethod||'sea';
   document.getElementById('f-item').value=p.item||'';
   document.getElementById('f-weight').value=p.weight||'';
-  document.getElementById('f-coeff').value=p.coeff||'';
   document.getElementById('f-shipmanual').value=p.shipManual||'';
   document.getElementById('f-sale').value=p.sale||'';
   document.getElementById('f-buydate').value=p.buyDate||todayISO();
   document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
-  updateNameSuggestions();toggleWeightRequired();
+  updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
 
@@ -1137,13 +1118,16 @@ function updatePreview(){const u=document.getElementById('f-img').value;const pv
   pv.innerHTML=u?`<img src="${u}" onerror="imgFallback(this,el=>{el.parentElement.innerHTML='<span>ссылка не открылась</span>'})">`:'<span>Предпросмотр фото</span>';}
 function recalc(){
   const p={img:document.getElementById('f-img').value,item:document.getElementById('f-item').value,
-    weight:document.getElementById('f-weight').value,coeff:document.getElementById('f-coeff').value,
+    weight:document.getElementById('f-weight').value,
     shipManual:document.getElementById('f-shipmanual').value,
     sale:document.getElementById('f-sale').value,
     // при редактировании существующего товара показываем предпросмотр по
-    // ЕГО уже зафиксированным курсам, а не по текущим настройкам
+    // ЕГО уже зафиксированным курсам и коэффициенту доставки (для старых
+    // товаров, у которых доставка ещё считалась по весу), а не по форме —
+    // поля-коэффициента в форме больше нет, доставка теперь всегда вручную
     rateCny:editingItemRates?editingItemRates.rateCny:undefined,
-    rateUah:editingItemRates?editingItemRates.rateUah:undefined};
+    rateUah:editingItemRates?editingItemRates.rateUah:undefined,
+    coeff:editingItemRates?editingItemRates.coeff:undefined};
   const c=compute(p);
   document.getElementById('c-item').textContent=fmt(c.itemUAH,' ₴');
   document.getElementById('c-ship').textContent=fmt(c.shipUAH,' ₴');
@@ -1171,11 +1155,10 @@ async function saveProduct(){
   const itemVal=document.getElementById('f-item').value;
   if(itemVal===''||isNaN(parseFloat(itemVal)))invalidIds.push('f-item');
   // вес не обязателен, если доставка указана напрямую в гривнах
-  const weightVal=document.getElementById('f-weight').value;
+  // доставка теперь всегда указывается вручную; вес — необязательное
+  // справочное поле, на стоимость и на валидацию не влияет
   const shipManualVal=document.getElementById('f-shipmanual').value;
-  if(!shipManualVal&&(weightVal===''||isNaN(parseFloat(weightVal)))){
-    invalidIds.push('f-weight');invalidIds.push('f-shipmanual');
-  }
+  if(shipManualVal===''||isNaN(parseFloat(shipManualVal)))invalidIds.push('f-shipmanual');
   if(!document.getElementById('f-buydate').value)invalidIds.push('f-buydate');
   if(invalidIds.length){
     invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
@@ -1190,20 +1173,18 @@ async function saveProduct(){
     shipMethod:document.getElementById('f-shipmethod').value,
     item:document.getElementById('f-item').value,
     weight:document.getElementById('f-weight').value,
-    coeff:document.getElementById('f-coeff').value,
     shipManual:document.getElementById('f-shipmanual').value,
     sale:document.getElementById('f-sale').value,
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,
     comment:document.getElementById('f-comment').value.trim()};
-  // курс юаня/доллара и (если не указан вручную) коэффициент доставки
-  // фиксируем ОДИН РАЗ — в момент создания товара — текущими значениями из
-  // настроек. При редактировании уже существующего товара эти поля не
-  // трогаем (ниже они просто не включены в p), поэтому дальнейшие правки
-  // настроек курсов/коэффициента больше не меняют стоимость этого товара.
+  // курс юаня/доллара фиксируем ОДИН РАЗ — в момент создания товара —
+  // текущими значениями из настроек. При редактировании уже существующего
+  // товара эти поля не трогаем (ниже они просто не включены в p), поэтому
+  // дальнейшие правки курсов в настройках больше не меняют стоимость этого
+  // товара.
   if(!editId){
     const s=settings();
-    if(p.coeff==='')p.coeff=String(s.coeff);
     p.rateCny=s.cny;
     p.rateUah=s.uah;
   }
@@ -1369,7 +1350,6 @@ function importData(e){
     try{
       const data=JSON.parse(ev.target.result);
       if(data.settings){const s=data.settings;
-        document.getElementById('s-coeff').value=s.coeff;
         document.getElementById('s-cny').value=s.cny;
         document.getElementById('s-uah').value=s.uah;
         localStorage.setItem(LS_SET,JSON.stringify(s));

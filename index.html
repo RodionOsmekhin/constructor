@@ -450,7 +450,7 @@
       </div>
       <div class="stats-section-title" style="margin-top:6px">Уже внесено</div>
       <table class="stats-table">
-        <thead><tr><th>Дата</th><th>Сумма</th><th></th></tr></thead>
+        <thead><tr><th>Дата</th><th>Сумма</th><th>Комментарий</th><th></th></tr></thead>
         <tbody id="adListBody"></tbody>
       </table>
       <div class="stats-empty" id="adListEmpty" style="display:none">Пока нет расходов на рекламу</div>
@@ -1253,6 +1253,7 @@ function renderAdList(){
   tbody.innerHTML=sorted.map(a=>`<tr>
     <td>${fmtDate(a.date)||'—'}</td>
     <td>${fmt(parseFloat(a.amount)||0,' ₴')}</td>
+    <td>${a.comment?escapeHtml(a.comment):'—'}</td>
     <td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="deleteAd('${a.id}')">✕</button></td>
   </tr>`).join('');
 }

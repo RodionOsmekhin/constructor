@@ -554,7 +554,8 @@ function renderSubcatTabs(){
   const wrap=document.getElementById('subcatTabs');
   if(currentCategory!=='clock'){wrap.style.display='none';return;}
   const hasOther=items.some(p=>p.category==='clock'&&!p.subcategory);
-  const opts=[{value:'',label:'Все'}].concat(CLOCK_SUBCATEGORIES.map(s=>({value:s.value,label:s.label})));
+  const nonEmptySubs=CLOCK_SUBCATEGORIES.filter(s=>items.some(p=>p.category==='clock'&&p.subcategory===s.value));
+  const opts=[{value:'',label:'Все'}].concat(nonEmptySubs.map(s=>({value:s.value,label:s.label})));
   if(hasOther)opts.push({value:'clock-other',label:'🕒 Другое'});
   if(opts.length<=2){wrap.style.display='none';return;}
   wrap.style.display='flex';

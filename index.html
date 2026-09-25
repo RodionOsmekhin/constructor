@@ -161,6 +161,7 @@
   #statsBody td:nth-child(2),#statsFoot td:nth-child(2){color:var(--red)}
   #statsBody td:nth-child(3),#statsFoot td:nth-child(3){color:var(--green)}
   #statsBody td:nth-child(4),#statsFoot td:nth-child(4){color:var(--gold)}
+  #statsTable.no-ads th:nth-child(4),#statsTable.no-ads td:nth-child(4){display:none}
   #statsSubcatBody td:nth-child(3),#statsSubcatFoot td:nth-child(3){color:var(--gold)}
   #statsSubcatBody td:nth-child(4),#statsSubcatFoot td:nth-child(4){color:var(--red)}
   #statsSubcatBody td:nth-child(5),#statsSubcatFoot td:nth-child(5){color:var(--green)}
@@ -289,8 +290,8 @@
   </div>
   <button class="btn btn-ghost stats-toggle" id="stats-toggle" onclick="toggleStats()">📊 Статистика ▾</button>
   <div class="stats-panel" id="statsPanel">
-    <table class="stats-table">
-      <thead><tr><th>Месяц</th><th>Траты</th><th>Доход</th><th>Реклама</th><th>Прибыль</th></tr></thead>
+    <table class="stats-table" id="statsTable">
+      <thead><tr><th>Месяц</th><th id="th-spend">Траты</th><th>Доход</th><th id="th-ads">Реклама</th><th>Прибыль</th></tr></thead>
       <tbody id="statsBody"></tbody>
       <tfoot id="statsFoot"></tfoot>
     </table>
@@ -468,6 +469,11 @@
       <button class="close-x" onclick="closeSubcatModal()">✕</button>
     </div>
     <div class="mbody">
+      <div class="preview" id="catalogPreview" style="height:90px"><span>Предпросмотр фото</span></div>
+      <div class="field">
+        <label>Ссылка на фото</label>
+        <input id="catalog-img" type="url" placeholder="https://..." oninput="updateCatalogPreview()">
+      </div>
       <div class="field2">
         <div class="field" style="flex:1">
           <label>Новая подкатегория</label>
@@ -486,15 +492,10 @@
       <div id="catalogList" class="catalog-list"></div>
       <div class="stats-empty" id="catalogListEmpty" style="display:none">Пока нет товаров в этой подкатегории</div>
 
-      <div class="field" style="margin-top:10px">
+      <div class="field">
         <label id="catalog-form-label">Название нового товара</label>
         <input id="catalog-name" type="text" placeholder="Например: Гриффиндор">
       </div>
-      <div class="field">
-        <label>Ссылка на фото</label>
-        <input id="catalog-img" type="url" placeholder="https://..." oninput="updateCatalogPreview()">
-      </div>
-      <div class="preview" id="catalogPreview" style="height:90px"><span>Предпросмотр фото</span></div>
     </div>
     <div class="mfoot">
       <button class="btn btn-ghost" onclick="closeSubcatModal()">Закрыть</button>
@@ -694,12 +695,17 @@ function compute(p){
   const cny=(p.rateCny!=null&&p.rateCny!=='')?parseFloat(p.rateCny):s.cny;
   const uah=(p.rateUah!=null&&p.rateUah!=='')?parseFloat(p.rateUah):s.uah;
   const coeff=parseFloat(p.coeff)||0;
-  const itemUAH=(parseFloat(p.item)||0)*cny;      // ¥ → ₴ напрямую
+  // округляем товар и доставку в ₴ до целого сразу здесь — так же, как они
+  // показываются пользователю. Иначе при ручном пересчёте (сложении round-
+  // ленных цифр с экрана) итог мог на 1 ₴ отличаться от того, что считает
+  // приложение (оно раньше складывало нерокруглённые значения и округляло
+  // только итог).
+  const itemUAH=Math.round((parseFloat(p.item)||0)*cny);      // ¥ → ₴ напрямую
   // если доставка указана вручную в гривнах — используем её напрямую,
   // вес и коэффициент в этом случае не учитываются
   const manualShip=(p.shipManual!=null&&p.shipManual!=='')?parseFloat(p.shipManual):null;
   const shipUSD=manualShip!=null?(uah>0?manualShip/uah:0):(parseFloat(p.weight)||0)*coeff;    // вес × коэф. в $
-  const shipUAH=manualShip!=null?manualShip:shipUSD*uah;                       // доставка $ → ₴
+  const shipUAH=Math.round(manualShip!=null?manualShip:shipUSD*uah);           // доставка $ → ₴
   const buyUAH=itemUAH+shipUAH;
   const buyUSD=uah>0?buyUAH/uah:0;
   const saleUAH=parseFloat(p.sale)||0;
@@ -1062,7 +1068,7 @@ async function deleteCatalogItem(id){
   }
 }
 document.getElementById('subcatOverlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
-document.getElementById('subcatOverlay').addEventListener('click',e=>{if(e.target.id==='subcatOverlay')closeSubcatModal();});
+// клик по фону намеренно не закрывает этот модал (см. комментарий у overlay)
 // список для быстрого выбора товара категории «Часы» — обычный select
 // (а не datalist), чтобы он открывался как надо на любом устройстве и его
 // можно было открывать и выбирать заново сколько угодно раз. Список сначала
@@ -1146,7 +1152,7 @@ function clearFieldInvalid(){document.querySelectorAll('.overlay .invalid').forE
 document.getElementById('overlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
 document.getElementById('overlay').addEventListener('change',e=>e.target.classList.remove('invalid'));
 document.getElementById('adOverlay').addEventListener('input',e=>e.target.classList.remove('invalid'));
-document.getElementById('adOverlay').addEventListener('click',e=>{if(e.target.id==='adOverlay')closeAdModal();});
+// клик по фону намеренно не закрывает этот модал (см. комментарий у overlay)
 async function saveProduct(){
   // проверка обязательных полей — карточка не должна создаваться/сохраняться,
   // если хоть одно из них не заполнено
@@ -1387,7 +1393,8 @@ async function syncBulkReplace(oldItems,newItems){
     catch(err){console.error('Не удалось сохранить товар '+it.id,err);}
   }
 }
-document.getElementById('overlay').addEventListener('click',e=>{if(e.target.id==='overlay')closeModal();});
+// клик по фону намеренно не закрывает модал "Новый/Редактировать товар" —
+// форма большая, и случайный клик мимо неё стирал бы введённые данные
 
 function toggleSettings(){
   const s=document.getElementById('settings'), open=s.classList.toggle('open');
@@ -1602,30 +1609,45 @@ function renderSubcatStats(){
 function renderStats(){
   renderStock();
   renderSubcatStats();
+  // для "Все" колонка "Траты" = стоимость закупки товаров по дате ПОКУПКИ,
+  // и прибыль = Доход − Траты − Реклама (как и было). Для конкретной
+  // категории (Часы/Конструктор) реклама общая на весь магазин и не
+  // относится к одной категории, поэтому там колонка "Закупка" = стоимость
+  // закупки именно тех товаров, что были ПРОДАНЫ в этом месяце, а прибыль =
+  // Доход − Закупка (без рекламы)
+  const countAds=!currentCategory;
   const spend={},income={},adSpend={};
   visibleItems().forEach(p=>{
     const c=compute(p);
-    if(p.buyDate){const k=p.buyDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;}
+    if(countAds){
+      if(p.buyDate){const k=p.buyDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;}
+    }else if(p.saleDate){
+      const k=p.saleDate.slice(0,7);spend[k]=(spend[k]||0)+c.buyUAH;
+    }
     if(p.saleDate){const k=p.saleDate.slice(0,7);income[k]=(income[k]||0)+c.saleUAH;}
   });
-  // расходы на рекламу — общие для всего магазина, не привязаны к категории
-  ads.forEach(a=>{
-    if(!a.date)return;
-    const k=a.date.slice(0,7);
-    adSpend[k]=(adSpend[k]||0)+(parseFloat(a.amount)||0);
-  });
+  if(countAds){
+    // расходы на рекламу — общие для всего магазина, не привязаны к категории
+    ads.forEach(a=>{
+      if(!a.date)return;
+      const k=a.date.slice(0,7);
+      adSpend[k]=(adSpend[k]||0)+(parseFloat(a.amount)||0);
+    });
+  }
   const months=Array.from(new Set([...Object.keys(spend),...Object.keys(income),...Object.keys(adSpend)])).sort();
   const body=document.getElementById('statsBody'), foot=document.getElementById('statsFoot');
   document.getElementById('statsEmpty').style.display=months.length?'none':'block';
+  document.getElementById('statsTable').classList.toggle('no-ads',!countAds);
+  document.getElementById('th-spend').textContent=countAds?'Траты':'Закупка';
   let tSpend=0,tIncome=0,tAds=0;
   body.innerHTML=months.map(k=>{
-    const sp=spend[k]||0, inc=income[k]||0, ad=adSpend[k]||0, pr=inc-sp-ad;
+    const sp=spend[k]||0, inc=income[k]||0, ad=adSpend[k]||0, pr=inc-sp-(countAds?ad:0);
     tSpend+=sp;tIncome+=inc;tAds+=ad;
     const pc=pr>=0?'pos':'neg';
     return`<tr><td>${monthLabel(k)}</td><td>${fmt(sp,' ₴')}</td><td>${fmt(inc,' ₴')}</td><td>${fmt(ad,' ₴')}</td>
       <td class="${pc}">${fmt(pr,' ₴')}</td></tr>`;
   }).join('');
-  const tp=tIncome-tSpend-tAds, tpc=tp>=0?'pos':'neg';
+  const tp=tIncome-tSpend-(countAds?tAds:0), tpc=tp>=0?'pos':'neg';
   foot.innerHTML=months.length?`<tr><td>Итого</td><td>${fmt(tSpend,' ₴')}</td><td>${fmt(tIncome,' ₴')}</td><td>${fmt(tAds,' ₴')}</td>
     <td class="${tpc}">${fmt(tp,' ₴')}</td></tr>`:'';
 
@@ -1634,19 +1656,20 @@ function renderStats(){
   const spendData=months.map(k=>spend[k]||0);
   const incomeData=months.map(k=>income[k]||0);
   const adData=months.map(k=>adSpend[k]||0);
-  const profitData=months.map(k=>(income[k]||0)-(spend[k]||0)-(adSpend[k]||0));
+  const profitData=months.map(k=>(income[k]||0)-(spend[k]||0)-(countAds?(adSpend[k]||0):0));
   const ctx=document.getElementById('chartMonthly').getContext('2d');
   if(statsChart)statsChart.destroy();
+  const chartDatasets=[
+    {label:countAds?'Траты':'Закупка',data:spendData,backgroundColor:'#ff5d6c'},
+    {label:'Доход',data:incomeData,backgroundColor:'#2fbf71'}
+  ];
+  if(countAds)chartDatasets.push({label:'Реклама',data:adData,backgroundColor:'#ffbf47'});
+  chartDatasets.push({label:'Прибыль',data:profitData,type:'line',borderColor:'#4f8cff',backgroundColor:'#4f8cff',tension:.3});
   statsChart=new Chart(ctx,{
     type:'bar',
     data:{
       labels:labels,
-      datasets:[
-        {label:'Траты',data:spendData,backgroundColor:'#ff5d6c'},
-        {label:'Доход',data:incomeData,backgroundColor:'#2fbf71'},
-        {label:'Реклама',data:adData,backgroundColor:'#ffbf47'},
-        {label:'Прибыль',data:profitData,type:'line',borderColor:'#4f8cff',backgroundColor:'#4f8cff',tension:.3}
-      ]
+      datasets:chartDatasets
     },
     options:{
       responsive:true,

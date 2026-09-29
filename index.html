@@ -324,9 +324,9 @@
   </div>
 
   <div class="cat-tabs" id="catTabs">
-    <button class="cat-tab active" data-cat="" onclick="setCategory('')">Все</button>
-    <button class="cat-tab" data-cat="clock" onclick="setCategory('clock')">🕒 Часы</button>
-    <button class="cat-tab" data-cat="constructor1" onclick="setCategory('constructor1')">🧱 Конструктор</button>
+    <button class="cat-tab active" data-cat="" data-label="Все" onclick="setCategory('')">Все</button>
+    <button class="cat-tab" data-cat="clock" data-label="🕒 Часы" onclick="setCategory('clock')">🕒 Часы</button>
+    <button class="cat-tab" data-cat="constructor1" data-label="🧱 Конструктор" onclick="setCategory('constructor1')">🧱 Конструктор</button>
   </div>
   <div class="subcat-tabs" id="subcatTabs" style="display:none"></div>
   <div id="grid" class="grid"></div>
@@ -533,11 +533,23 @@ let currentSubcategoryFilter=localStorage.getItem(LS_SUBCAT_FILTER)||'';
 // обратно к обычному порядку. Сбрасывается при выборе другой подкатегории.
 let showSoldFirst=false;
 function setCategory(cat){
-  currentCategory=cat;
-  localStorage.setItem(LS_CATEGORY,cat);
-  showSoldFirst=false;
-  document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===cat));
+  // повторный клик на уже активную категорию (как и с подкатегориями)
+  // переключает порядок — проданные наверх и обратно
+  if(cat===currentCategory){
+    showSoldFirst=!showSoldFirst;
+  }else{
+    currentCategory=cat;
+    localStorage.setItem(LS_CATEGORY,cat);
+    showSoldFirst=false;
+  }
   render();
+}
+function renderCatTabs(){
+  document.querySelectorAll('.cat-tab').forEach(b=>{
+    const isActive=b.dataset.cat===currentCategory;
+    b.classList.toggle('active',isActive);
+    b.textContent=isActive&&showSoldFirst?b.dataset.label+' • ↑':b.dataset.label;
+  });
 }
 function setSubcategoryFilter(sub){
   if(sub===currentSubcategoryFilter){
@@ -754,6 +766,7 @@ function imgFallback(img,onFail){
 
 function render(){
   syncSubcategoriesFromItems();
+  renderCatTabs();
   renderSubcatTabs();
   const grid=document.getElementById('grid');
   const list=visibleItems();
@@ -1683,7 +1696,7 @@ function renderStats(){
 
 }
 
-document.querySelectorAll('.cat-tab').forEach(b=>b.classList.toggle('active',b.dataset.cat===currentCategory));
+renderCatTabs();
 loadSettings();loadItems();loadAds();loadCatalog();render();
 loadFromSheet();
 </script>

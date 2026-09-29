@@ -409,6 +409,19 @@
           <input id="f-saledate" type="date">
         </div>
       </div>
+      <div class="field2">
+        <div class="field">
+          <label>Телефон</label>
+          <input id="f-phone" type="tel" placeholder="+38..." oninput="onPhoneInput(this)" onfocus="onPhoneInput(this)">
+        </div>
+        <div class="field">
+          <label>Мессенджер</label>
+          <select id="f-messenger">
+            <option value="viber">Viber</option>
+            <option value="telegram" selected>Telegram</option>
+          </select>
+        </div>
+      </div>
       <div class="field">
         <label>Комментарий</label>
         <textarea id="f-comment" placeholder="Любые заметки к товару..."></textarea>
@@ -846,8 +859,19 @@ function todayISO(){const d=new Date();const pad=n=>String(n).padStart(2,'0');
 // зафиксированные курсы, чтобы предпросмотр стоимости в самой форме тоже
 // показывал их, а не текущие (возможно, уже другие) курсы из настроек
 let editingItemRates=null;
+// поле "Телефон" всегда должно начинаться с "+38" — пользователь вводит
+// только то, что идёт после этого префикса, а сами цифры визуально
+// разбиваются дефисами по образцу 068-061-73-23
+function formatPhone(v){
+  v=v||'';
+  const rest=v.indexOf('+38')===0?v.slice(3):v;
+  const digits=rest.replace(/\D/g,'').replace(/^380/,'').slice(0,10);
+  const groups=[digits.slice(0,3),digits.slice(3,6),digits.slice(6,8),digits.slice(8,10)].filter(Boolean);
+  return '+38'+groups.join('-');
+}
+function onPhoneInput(el){el.value=formatPhone(el.value);}
 function openModal(){editId=null;editingItemRates=null;document.getElementById('modal-title').textContent='Новый товар';
-  ['f-img','f-name','f-item','f-weight','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment'].forEach(i=>document.getElementById(i).value='');
+  ['f-img','f-name','f-item','f-weight','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment','f-phone'].forEach(i=>document.getElementById(i).value='');
   // дата покупки — обязательное поле, по умолчанию сегодняшняя дата
   document.getElementById('f-buydate').value=todayISO();
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
@@ -855,6 +879,8 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-category').value=currentCategory;
   document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
+  document.getElementById('f-phone').value=formatPhone('');
+  document.getElementById('f-messenger').value='telegram';
   updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
@@ -872,6 +898,8 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-buydate').value=p.buyDate||todayISO();
   document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
+  document.getElementById('f-phone').value=formatPhone(p.phone||'');
+  document.getElementById('f-messenger').value=p.messenger||'telegram';
   updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -1186,6 +1214,9 @@ async function saveProduct(){
     document.getElementById(invalidIds[0]).focus();
     return;
   }
+  // "Телефон" необязателен — если пользователь так и оставил один только
+  // префикс "+38", ничего не вводя дальше, считаем поле пустым
+  const phoneRaw=document.getElementById('f-phone').value.trim();
   const p={img:document.getElementById('f-img').value.trim(),
     name:document.getElementById('f-name').value.trim(),
     category:document.getElementById('f-category').value,
@@ -1197,7 +1228,9 @@ async function saveProduct(){
     sale:document.getElementById('f-sale').value,
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,
-    comment:document.getElementById('f-comment').value.trim()};
+    comment:document.getElementById('f-comment').value.trim(),
+    phone:phoneRaw==='+38'?'':phoneRaw,
+    messenger:document.getElementById('f-messenger').value};
   // курс юаня/доллара фиксируем ОДИН РАЗ — в момент создания товара —
   // текущими значениями из настроек. При редактировании уже существующего
   // товара эти поля не трогаем (ниже они просто не включены в p), поэтому

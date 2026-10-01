@@ -385,6 +385,11 @@
           <option value="air">✈️ Авиа</option>
         </select>
       </div>
+      <div class="field" id="f-create-qty-wrap">
+        <label>Количество одинаковых товаров</label>
+        <input id="f-create-qty" type="number" min="1" step="1" placeholder="1">
+        <div class="hint">Создаст столько отдельных карточек с одинаковыми данными — каждую потом можно будет продать/отредактировать независимо</div>
+      </div>
         <div class="field">
           <label>Стоимость товара в юанях ¥ <span class="req">*</span></label>
           <input id="f-item" type="number" step="0.01" placeholder="0" oninput="recalc()">
@@ -883,11 +888,16 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-shipmethod').value='sea';
   document.getElementById('f-phone').value=formatPhone('');
   document.getElementById('f-messenger').value='telegram';
+  document.getElementById('f-create-qty').value='1';
+  // количество одинаковых копий имеет смысл только при создании нового
+  // товара — у уже существующей карточки это поле скрываем
+  document.getElementById('f-create-qty-wrap').style.display='';
   updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   editingItemRates={rateCny:p.rateCny,rateUah:p.rateUah,coeff:p.coeff};
   document.getElementById('modal-title').textContent='Изменить товар';
+  document.getElementById('f-create-qty-wrap').style.display='none';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
   document.getElementById('f-category').value=p.category||'';
@@ -1244,31 +1254,50 @@ async function saveProduct(){
     p.rateUah=s.uah;
   }
   const wasEditing=!!editId;
-  let prevIdx=-1, prevItem=null, rec;
+  let prevIdx=-1, prevItem=null, recs;
   if(wasEditing){
     prevIdx=items.findIndex(x=>x.id===editId);
     if(prevIdx===-1)return;
     prevItem={...items[prevIdx]};
     items[prevIdx]={...items[prevIdx],...p};
-    rec=items[prevIdx];
+    recs=[items[prevIdx]];
   }else{
-    p.id='p'+uid();
-    items.unshift(p);
-    rec=p;
+    // "Количество одинаковых товаров" — создаём несколько отдельных карточек
+    // с одинаковыми данными одним сохранением, чтобы не заполнять форму
+    // заново для каждой копии. Каждая копия — самостоятельный товар со своим
+    // id, дальше её можно продать/отредактировать независимо от остальных.
+    const qtyRaw=parseInt(document.getElementById('f-create-qty').value,10);
+    const copies=(!isNaN(qtyRaw)&&qtyRaw>1)?qtyRaw:1;
+    recs=[];
+    for(let i=0;i<copies;i++){
+      const copy={...p,id:'p'+uid()};
+      items.unshift(copy);
+      recs.push(copy);
+    }
   }
   // оптимистично показываем изменения сразу, не дожидаясь ответа сервера
   persistLocal();render();closeModal();
   setSyncStatus('saving');
-  try{
-    await apiPost({type:'item',action:wasEditing?'update':'add',data:rec});
-    setSyncStatus('saved');
-  }catch(err){
-    // не удалось сохранить на сервере — откатываем изменения на экране
+  const failed=[];
+  for(const rec of recs){
+    try{
+      await apiPost({type:'item',action:wasEditing?'update':'add',data:rec});
+    }catch(err){
+      failed.push({rec,err});
+    }
+  }
+  if(failed.length){
+    // откатываем на экране только те копии, что не удалось сохранить на сервере
     if(wasEditing){items[prevIdx]=prevItem;}
-    else{items=items.filter(x=>x.id!==rec.id);}
+    else{
+      const failedIds=new Set(failed.map(f=>f.rec.id));
+      items=items.filter(x=>!failedIds.has(x.id));
+    }
     persistLocal();render();
     setSyncStatus('error');
-    alert('Не удалось сохранить товар в таблице: '+err.message+'\nПопробуйте ещё раз.');
+    alert('Не удалось сохранить '+failed.length+' из '+recs.length+' товар(ов) в таблице: '+failed[0].err.message+'\nПопробуйте ещё раз.');
+  }else{
+    setSyncStatus('saved');
   }
 }
 async function delItem(id){
@@ -1746,6 +1775,11 @@ function renderStats(){
   });
 
 }
+
+document.addEventListener('wheel',function(e){
+  const el=document.activeElement;
+  if(el && el.tagName==='INPUT' && el.type==='number'){el.blur();}
+},{passive:true});
 
 renderCatTabs();
 loadSettings();loadItems();loadAds();loadCatalog();render();

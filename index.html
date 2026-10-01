@@ -10,6 +10,7 @@
 <meta name="apple-mobile-web-app-title" content="Товары">
 <title>Учёт товаров — закупка и продажа</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#0f1115; --panel:#171a21; --panel2:#1e222c; --line:#2a2f3a;
@@ -283,6 +284,7 @@
       </div>
     </div>
     <div class="set-card set-card-io" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+      <button class="btn btn-ghost" style="width:100%" onclick="exportContacts()">📇 Импорт контактов</button>
       <button class="btn btn-ghost" style="width:100%" onclick="exportData()">⇩ Экспорт данных</button>
       <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
       <input id="importFile" type="file" accept="application/json" style="display:none" onchange="importData(event)">
@@ -1371,6 +1373,22 @@ async function ensurePerm(h){
 function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;}
 
+// собирает телефон+мессенджер по всем товарам, у которых телефон указан,
+// в настоящую Excel-таблицу (3 отдельные колонки) и скачивает её
+// (кнопка "📇 Импорт контактов")
+function exportContacts(){
+  const rows=items.filter(p=>p.phone);
+  if(!rows.length){alert('Пока нет ни одного товара с указанным телефоном.');return;}
+  const aoa=[['Название','Телефон','Мессенджер']];
+  rows.forEach(p=>{
+    aoa.push([p.name||'',p.phone||'',p.messenger==='viber'?'Viber':'Telegram']);
+  });
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:28},{wch:16},{wch:12}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Контакты');
+  XLSX.writeFile(wb,'contacts_'+stamp()+'.xlsx');
+}
 async function exportData(){
   const now=new Date();
   const payload={saved_at:now.toLocaleString('ru-RU'),saved_iso:now.toISOString(),

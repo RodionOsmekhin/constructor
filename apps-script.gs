@@ -47,9 +47,6 @@ const ADSPEND_FIELDS = ['id','date','amount','comment'];
 // товары-шаблоны (название+фото) для подкатегорий, которые пользователь
 // создаёт через окно "🏷️ Подкатегории" в приложении
 const CATALOG_FIELDS = ['id','subcategory','name','img'];
-// категории, созданные пользователем (кроме встроенных «Часы»/«Конструктор»)
-const CATEGORIES_SHEET = 'categories';
-const CATEGORY_FIELDS = ['id','name'];
 
 function checkKey(e) {
   const key = (e.parameter && e.parameter.key) || '';
@@ -59,7 +56,7 @@ function checkKey(e) {
 function doGet(e) {
   if (!checkKey(e)) return jsonOut({ok: false, error: 'bad key'});
   const data = readAll();
-  return jsonOut({ok: true, items: data.items, settings: data.settings, ads: data.ads, catalog: data.catalog, categories: data.categories});
+  return jsonOut({ok: true, items: data.items, settings: data.settings, ads: data.ads, catalog: data.catalog});
 }
 
 function doPost(e) {
@@ -115,26 +112,6 @@ function doPost(e) {
       } else if (payload.action === 'delete') {
         const rowIndex = findRowById(catSheet, payload.id);
         if (rowIndex > -1) catSheet.deleteRow(rowIndex);
-      } else {
-        return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
-      }
-      return jsonOut({ok: true});
-    }
-
-    if (payload.type === 'category') {
-      const catgSheet = getSheet(CATEGORIES_SHEET, CATEGORY_FIELDS);
-      if (payload.action === 'add') {
-        appendRowSafe(catgSheet, CATEGORY_FIELDS, payload.data);
-      } else if (payload.action === 'update') {
-        const rowIndex = findRowById(catgSheet, payload.data.id);
-        if (rowIndex > -1) {
-          writeRowSafe(catgSheet, rowIndex, CATEGORY_FIELDS, payload.data);
-        } else {
-          appendRowSafe(catgSheet, CATEGORY_FIELDS, payload.data);
-        }
-      } else if (payload.action === 'delete') {
-        const rowIndex = findRowById(catgSheet, payload.id);
-        if (rowIndex > -1) catgSheet.deleteRow(rowIndex);
       } else {
         return jsonOut({ok: false, error: 'unknown action: ' + payload.action});
       }
@@ -266,15 +243,5 @@ function readAll() {
       return o;
     });
 
-  const ctgSh = getSheet(CATEGORIES_SHEET, CATEGORY_FIELDS);
-  const ctgRows = ctgSh.getDataRange().getValues();
-  const categories = ctgRows.slice(1)
-    .filter(r => r.some(c => c !== '' && c !== null))
-    .map(r => {
-      const o = {};
-      CATEGORY_FIELDS.forEach((f, i) => { o[f] = cellToString(r[i]); });
-      return o;
-    });
-
-  return {items: items, settings: settings, ads: ads, catalog: catalog, categories: categories};
+  return {items: items, settings: settings, ads: ads, catalog: catalog};
 }

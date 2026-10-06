@@ -557,28 +557,38 @@ let nameCatalog=[];
 function loadCatalog(){nameCatalog=JSON.parse(localStorage.getItem(LS_CATALOG)||'[]');}
 function persistCatalogLocal(){localStorage.setItem(LS_CATALOG,JSON.stringify(nameCatalog));}
 
-// категории, созданные пользователем: [{id,name}]. Встроенные («Часы»,
-// «Конструктор») остаются как были; у товара в поле category лежит либо
-// 'clock'/'constructor1', либо id пользовательской категории.
+// Категории — по аналогии с «Часы»/«Конструктор»: отдельного листа в таблице
+// нет. У товара в поле category лежит либо 'clock'/'constructor1', либо просто
+// название своей категории (например «🎀 Декор»). Список своих категорий =
+// названия, которые встречаются у товаров, + только что созданные пустые
+// (они хранятся в браузере, пока в категорию не добавлен первый товар — после
+// этого она живёт в таблице вместе с товарами).
 const LS_CATEGORIES='constructor_categories';
-let customCategories=[];
-// true, когда сервер (apps-script.gs) уже умеет хранить категории — без этого
-// создавать их нельзя, иначе старая версия скрипта записала бы запись как товар
-let serverHasCategories=false;
+let extraCategories=[];
+const RESERVED_CATEGORY_KEYS=['','clock','constructor1','none','clock-other'];
 const BUILTIN_CATEGORIES=[
   {value:'',label:'Все'},
   {value:'clock',label:'🕒 Часы'},
   {value:'constructor1',label:'🧱 Конструктор'}
 ];
-function loadCategories(){customCategories=JSON.parse(localStorage.getItem(LS_CATEGORIES)||'[]');}
-function persistCategoriesLocal(){localStorage.setItem(LS_CATEGORIES,JSON.stringify(customCategories));}
+function loadCategories(){
+  try{extraCategories=JSON.parse(localStorage.getItem(LS_CATEGORIES)||'[]').filter(x=>typeof x==='string');}
+  catch(e){extraCategories=[];}
+}
+function persistCategoriesLocal(){localStorage.setItem(LS_CATEGORIES,JSON.stringify(extraCategories));}
+function customCategories(){
+  const names=new Set(extraCategories);
+  items.forEach(p=>{if(p.category)names.add(p.category);});
+  return [...names].filter(n=>!RESERVED_CATEGORY_KEYS.includes(n))
+    .sort((a,b)=>a.localeCompare(b,'ru')).map(n=>({id:n,name:n}));
+}
 // если название уже начинается со своего эмодзи (например «🎀 Декор») —
 // не добавляем перед ним значок папки
 function customCatLabel(name){
   return /^\p{Extended_Pictographic}/u.test(name)?name:'📁 '+name;
 }
 function allCategoryOptions(){
-  return BUILTIN_CATEGORIES.concat(customCategories.map(c=>({value:c.id,label:customCatLabel(c.name),custom:true,name:c.name})));
+  return BUILTIN_CATEGORIES.concat(customCategories().map(c=>({value:c.id,label:customCatLabel(c.name),custom:true,name:c.name})));
 }
 function categoryLabel(key){
   const f=allCategoryOptions().find(o=>o.value===key);
@@ -590,69 +600,40 @@ function rebuildCategoryOptions(selected){
     `<option value="${escapeHtml(o.value)}">${o.value===''?'Без категории':escapeHtml(o.label)}</option>`).join('');
   sel.value=allCategoryOptions().some(o=>o.value===selected)?selected:'';
 }
-// список своих категорий в окне "Категории и подкатегории" (режим «Категорию»)
+// список своих категорий в окне "Категории" (режим «Категорию»)
 function renderCatManage(){
   const list=document.getElementById('catManageList');
   if(!list)return;
-  document.getElementById('catManageEmpty').style.display=customCategories.length?'none':'block';
-  list.innerHTML=customCategories.map(c=>{
+  const cats=customCategories();
+  document.getElementById('catManageEmpty').style.display=cats.length?'none':'block';
+  list.innerHTML=cats.map(c=>{
     const n=items.filter(p=>p.category===c.id).length;
     return `<div class="cat-manage-row"><span>${escapeHtml(customCatLabel(c.name))} <span style="color:var(--muted)">· товаров: ${n}</span></span>`
-      +`<button class="btn btn-ghost btn-sm" title="${n?'Удалять можно только пустую категорию':'Удалить'}" ${n?'disabled':''} onclick="deleteCategory('${c.id}')">✕</button></div>`;
+      +`<button class="btn btn-ghost btn-sm" title="${n?'Удалять можно только пустую категорию':'Удалить'}" ${n?'disabled':''} data-cat="${escapeHtml(c.id)}" onclick="deleteCategory(this.dataset.cat)">✕</button></div>`;
   }).join('');
 }
-async function createCategory(){
+function createCategory(){
   const inp=document.getElementById('cat-new-name');
   const name=inp.value.trim();
   if(!name){inp.classList.add('invalid');inp.focus();return;}
-  if(!serverHasCategories){
-    alert('Сервер (Apps Script) ещё не обновлён для работы с категориями. Вставьте свежий apps-script.gs в редактор и передеплойте его (Новая версия), затем нажмите «🔄 Обновить».');
-    return;
-  }
   const lower=name.toLowerCase();
-  const dup=allCategoryOptions().some(o=>o.value!==''&&(o.custom?o.name:o.label.replace(/^\S+\s/,'')).toLowerCase()===lower);
+  const dup=RESERVED_CATEGORY_KEYS.includes(lower)
+    ||allCategoryOptions().some(o=>o.value!==''&&(o.custom?o.name:o.label.replace(/^\S+\s/,'')).toLowerCase()===lower);
   if(dup){alert('Категория с таким названием уже есть.');return;}
-  const rec={id:'ctg'+uid(),name};
-  customCategories.push(rec);
+  extraCategories.push(name);
   persistCategoriesLocal();
   inp.value='';
-  currentCategory=rec.id;showSoldFirst=false;
-  localStorage.setItem(LS_CATEGORY,rec.id);
+  currentCategory=name;showSoldFirst=false;
+  localStorage.setItem(LS_CATEGORY,name);
   render();renderCatManage();
-  setSyncStatus('saving');
-  try{
-    await apiPost({type:'category',action:'add',data:rec});
-    setSyncStatus('saved');
-  }catch(err){
-    customCategories=customCategories.filter(c=>c.id!==rec.id);
-    persistCategoriesLocal();
-    currentCategory='';localStorage.setItem(LS_CATEGORY,'');
-    render();renderCatManage();
-    setSyncStatus('error');
-    alert('Не удалось сохранить категорию в таблице: '+err.message);
-  }
 }
-async function deleteCategory(id){
+function deleteCategory(id){
   if(items.some(p=>p.category===id)){alert('В категории есть товары — удалять можно только пустую.');return;}
-  const cat=customCategories.find(c=>c.id===id);if(!cat)return;
-  if(!confirm('Удалить категорию «'+cat.name+'»?'))return;
-  const prevCurrent=currentCategory;
-  customCategories=customCategories.filter(c=>c.id!==id);
+  if(!confirm('Удалить категорию «'+id+'»?'))return;
+  extraCategories=extraCategories.filter(n=>n!==id);
   persistCategoriesLocal();
   if(currentCategory===id){currentCategory='';showSoldFirst=false;localStorage.setItem(LS_CATEGORY,'');}
   render();renderCatManage();
-  setSyncStatus('saving');
-  try{
-    await apiPost({type:'category',action:'delete',id});
-    setSyncStatus('saved');
-  }catch(err){
-    customCategories.push(cat);
-    persistCategoriesLocal();
-    currentCategory=prevCurrent;localStorage.setItem(LS_CATEGORY,prevCurrent);
-    render();renderCatManage();
-    setSyncStatus('error');
-    alert('Не удалось удалить категорию в таблице: '+err.message);
-  }
 }
 
 // категория — просто фильтр отображения (как раньше делали кнопки
@@ -689,7 +670,7 @@ function renderCatTabs(){
   document.getElementById('catTabs').innerHTML=allCategoryOptions().map(o=>{
     const isActive=o.value===currentCategory;
     const label=escapeHtml(isActive&&showSoldFirst?o.label+' • ↑':o.label);
-    return `<button class="cat-tab${isActive?' active':''}" onclick="setCategory('${o.value}')">${label}</button>`;
+    return `<button class="cat-tab${isActive?' active':''}" data-cat="${escapeHtml(o.value)}" onclick="setCategory(this.dataset.cat)">${label}</button>`;
   }).join('');
 }
 function setSubcategoryFilter(sub){
@@ -795,8 +776,6 @@ async function loadFromSheet(){
       localStorage.setItem(LS_SET,JSON.stringify(s));}
     if(Array.isArray(data.ads))ads=data.ads.map(a=>({id:a.id,date:normalizeDate(a.date),amount:a.amount,comment:a.comment||''})).reverse();
     if(Array.isArray(data.catalog))nameCatalog=data.catalog.map(c=>({id:c.id,subcategory:c.subcategory,name:c.name,img:c.img||''}));
-    serverHasCategories=Array.isArray(data.categories);
-    if(serverHasCategories)customCategories=data.categories.map(c=>({id:c.id,name:c.name}));
     persistLocal();persistAdsLocal();persistCatalogLocal();persistCategoriesLocal();render();
     setSyncStatus('saved');
     return true;
@@ -1686,7 +1665,7 @@ function stockSectionLabel(key){
   if(key==='clock-other')return'🕒 Часы — другое';
   if(key==='constructor1')return'🧱 Конструктор';
   if(key==='none')return'Без категории';
-  const cc=customCategories.find(c=>c.id===key);
+  const cc=customCategories().find(c=>c.id===key);
   if(cc)return customCatLabel(cc.name);
   const found=CLOCK_SUBCATEGORIES.find(s=>s.value===key);
   return found?found.label:('🏷️ '+key);

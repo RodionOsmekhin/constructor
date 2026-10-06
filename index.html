@@ -143,6 +143,8 @@
   .cat-tab{border:1px solid var(--line);background:var(--panel2);color:var(--muted);
     border-radius:999px;padding:8px 16px;font-size:13px;font-weight:600;cursor:pointer}
   .cat-tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .cat-manage-row{display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:8px 0;border-bottom:1px solid var(--line);font-size:14px}
   .subcat-tabs{display:flex;gap:6px;flex-wrap:wrap;margin:-8px 0 16px}
   .subcat-tab{border:1px solid var(--line);background:transparent;color:var(--muted);
     border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer}
@@ -269,7 +271,7 @@
     <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
       <button class="btn btn-primary" style="width:100%" onclick="openModal()">📦 Добавить товар</button>
       <button class="btn btn-ghost" style="width:100%" onclick="openAdModal()">📣 Добавить рекламу</button>
-      <button class="btn btn-ghost" style="width:100%" onclick="openSubcatModal()">🏷️ Подкатегории</button>
+      <button class="btn btn-ghost" style="width:100%" onclick="openSubcatModal()">🏷️ Категории</button>
     </div>
     <div class="set-card">
       <div style="display:flex;flex-direction:column;gap:10px">
@@ -325,11 +327,7 @@
     </div>
   </div>
 
-  <div class="cat-tabs" id="catTabs">
-    <button class="cat-tab active" data-cat="" data-label="Все" onclick="setCategory('')">Все</button>
-    <button class="cat-tab" data-cat="clock" data-label="🕒 Часы" onclick="setCategory('clock')">🕒 Часы</button>
-    <button class="cat-tab" data-cat="constructor1" data-label="🧱 Конструктор" onclick="setCategory('constructor1')">🧱 Конструктор</button>
-  </div>
+  <div class="cat-tabs" id="catTabs"></div>
   <div class="subcat-tabs" id="subcatTabs" style="display:none"></div>
   <div id="grid" class="grid"></div>
   <div id="empty" class="empty" style="display:none">
@@ -372,11 +370,7 @@
       </div>
       <div class="field">
         <label>Категория</label>
-        <select id="f-category" onchange="updateNameSuggestions()">
-          <option value="">Без категории</option>
-          <option value="clock">🕒 Часы</option>
-          <option value="constructor1">🧱 Конструктор</option>
-        </select>
+        <select id="f-category" onchange="updateNameSuggestions()"></select>
       </div>
       <div class="field">
         <label>Способ доставки</label>
@@ -485,11 +479,34 @@
 
 <div class="overlay" id="subcatOverlay">
   <div class="modal">
-    <div class="mhead"><h2>Подкатегории (Часы)</h2>
+    <div class="mhead"><h2>Категории</h2>
       <button class="close-x" onclick="closeSubcatModal()">✕</button>
     </div>
     <div class="mbody">
-      <div class="preview" id="catalogPreview" style="height:90px"><span>Предпросмотр фото</span></div>
+      <div class="field">
+        <label>Что создаём</label>
+        <select id="subcat-mode" onchange="setSubcatMode(this.value)">
+          <option value="sub">🏷️ Подкатегорию</option>
+          <option value="cat">📁 Категорию</option>
+        </select>
+      </div>
+
+      <div id="subcatModeCat" style="display:none">
+        <div class="field2">
+          <div class="field" style="flex:1">
+            <label>Новая категория</label>
+            <input id="cat-new-name" type="text" placeholder="Например: Игрушки"
+              onkeydown="if(event.key==='Enter'){event.preventDefault();createCategory();}">
+          </div>
+          <button class="btn btn-primary" style="align-self:flex-end;white-space:nowrap" onclick="createCategory()">Создать</button>
+        </div>
+        <div class="stats-section-title" style="margin-top:6px">Созданные категории</div>
+        <div id="catManageList"></div>
+        <div class="stats-empty" id="catManageEmpty" style="display:none">Пока нет своих категорий</div>
+      </div>
+
+      <div id="subcatModeSub">
+      <div class="preview" id="catalogPreview"><span>Предпросмотр фото</span></div>
       <div class="field">
         <label>Ссылка на фото</label>
         <input id="catalog-img" type="url" placeholder="https://..." oninput="updateCatalogPreview()">
@@ -516,6 +533,7 @@
         <label id="catalog-form-label">Название нового товара</label>
         <input id="catalog-name" type="text" placeholder="Например: Гриффиндор">
       </div>
+      </div>
     </div>
     <div class="mfoot">
       <button class="btn btn-ghost" onclick="closeSubcatModal()">Закрыть</button>
@@ -538,6 +556,99 @@ function persistAdsLocal(){localStorage.setItem(LS_ADS,JSON.stringify(ads));}
 let nameCatalog=[];
 function loadCatalog(){nameCatalog=JSON.parse(localStorage.getItem(LS_CATALOG)||'[]');}
 function persistCatalogLocal(){localStorage.setItem(LS_CATALOG,JSON.stringify(nameCatalog));}
+
+// категории, созданные пользователем: [{id,name}]. Встроенные («Часы»,
+// «Конструктор») остаются как были; у товара в поле category лежит либо
+// 'clock'/'constructor1', либо id пользовательской категории.
+const LS_CATEGORIES='constructor_categories';
+let customCategories=[];
+// true, когда сервер (apps-script.gs) уже умеет хранить категории — без этого
+// создавать их нельзя, иначе старая версия скрипта записала бы запись как товар
+let serverHasCategories=false;
+const BUILTIN_CATEGORIES=[
+  {value:'',label:'Все'},
+  {value:'clock',label:'🕒 Часы'},
+  {value:'constructor1',label:'🧱 Конструктор'}
+];
+function loadCategories(){customCategories=JSON.parse(localStorage.getItem(LS_CATEGORIES)||'[]');}
+function persistCategoriesLocal(){localStorage.setItem(LS_CATEGORIES,JSON.stringify(customCategories));}
+function allCategoryOptions(){
+  return BUILTIN_CATEGORIES.concat(customCategories.map(c=>({value:c.id,label:'📁 '+c.name,custom:true})));
+}
+function categoryLabel(key){
+  const f=allCategoryOptions().find(o=>o.value===key);
+  return f?f.label:'';
+}
+function rebuildCategoryOptions(selected){
+  const sel=document.getElementById('f-category');
+  sel.innerHTML=allCategoryOptions().map(o=>
+    `<option value="${escapeHtml(o.value)}">${o.value===''?'Без категории':escapeHtml(o.label)}</option>`).join('');
+  sel.value=allCategoryOptions().some(o=>o.value===selected)?selected:'';
+}
+// список своих категорий в окне "Категории и подкатегории" (режим «Категорию»)
+function renderCatManage(){
+  const list=document.getElementById('catManageList');
+  if(!list)return;
+  document.getElementById('catManageEmpty').style.display=customCategories.length?'none':'block';
+  list.innerHTML=customCategories.map(c=>{
+    const n=items.filter(p=>p.category===c.id).length;
+    return `<div class="cat-manage-row"><span>📁 ${escapeHtml(c.name)} <span style="color:var(--muted)">· товаров: ${n}</span></span>`
+      +`<button class="btn btn-ghost btn-sm" title="${n?'Удалять можно только пустую категорию':'Удалить'}" ${n?'disabled':''} onclick="deleteCategory('${c.id}')">✕</button></div>`;
+  }).join('');
+}
+async function createCategory(){
+  const inp=document.getElementById('cat-new-name');
+  const name=inp.value.trim();
+  if(!name){inp.classList.add('invalid');inp.focus();return;}
+  if(!serverHasCategories){
+    alert('Сервер (Apps Script) ещё не обновлён для работы с категориями. Вставьте свежий apps-script.gs в редактор и передеплойте его (Новая версия), затем нажмите «🔄 Обновить».');
+    return;
+  }
+  const lower=name.toLowerCase();
+  const dup=allCategoryOptions().some(o=>o.value!==''&&o.label.replace(/^\S+\s/,'').toLowerCase()===lower);
+  if(dup){alert('Категория с таким названием уже есть.');return;}
+  const rec={id:'ctg'+uid(),name};
+  customCategories.push(rec);
+  persistCategoriesLocal();
+  inp.value='';
+  currentCategory=rec.id;showSoldFirst=false;
+  localStorage.setItem(LS_CATEGORY,rec.id);
+  render();renderCatManage();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'category',action:'add',data:rec});
+    setSyncStatus('saved');
+  }catch(err){
+    customCategories=customCategories.filter(c=>c.id!==rec.id);
+    persistCategoriesLocal();
+    currentCategory='';localStorage.setItem(LS_CATEGORY,'');
+    render();renderCatManage();
+    setSyncStatus('error');
+    alert('Не удалось сохранить категорию в таблице: '+err.message);
+  }
+}
+async function deleteCategory(id){
+  if(items.some(p=>p.category===id)){alert('В категории есть товары — удалять можно только пустую.');return;}
+  const cat=customCategories.find(c=>c.id===id);if(!cat)return;
+  if(!confirm('Удалить категорию «'+cat.name+'»?'))return;
+  const prevCurrent=currentCategory;
+  customCategories=customCategories.filter(c=>c.id!==id);
+  persistCategoriesLocal();
+  if(currentCategory===id){currentCategory='';showSoldFirst=false;localStorage.setItem(LS_CATEGORY,'');}
+  render();renderCatManage();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'category',action:'delete',id});
+    setSyncStatus('saved');
+  }catch(err){
+    customCategories.push(cat);
+    persistCategoriesLocal();
+    currentCategory=prevCurrent;localStorage.setItem(LS_CATEGORY,prevCurrent);
+    render();renderCatManage();
+    setSyncStatus('error');
+    alert('Не удалось удалить категорию в таблице: '+err.message);
+  }
+}
 
 // категория — просто фильтр отображения (как раньше делали кнопки
 // «Часы»/«Конструктор»), а не отдельный набор данных:
@@ -565,11 +676,16 @@ function setCategory(cat){
   render();
 }
 function renderCatTabs(){
-  document.querySelectorAll('.cat-tab').forEach(b=>{
-    const isActive=b.dataset.cat===currentCategory;
-    b.classList.toggle('active',isActive);
-    b.textContent=isActive&&showSoldFirst?b.dataset.label+' • ↑':b.dataset.label;
-  });
+  // если выбранная категория уже не существует (удалена/не синхронизирована) —
+  // возвращаемся на «Все»
+  if(currentCategory&&!allCategoryOptions().some(o=>o.value===currentCategory)){
+    currentCategory='';localStorage.setItem(LS_CATEGORY,'');
+  }
+  document.getElementById('catTabs').innerHTML=allCategoryOptions().map(o=>{
+    const isActive=o.value===currentCategory;
+    const label=escapeHtml(isActive&&showSoldFirst?o.label+' • ↑':o.label);
+    return `<button class="cat-tab${isActive?' active':''}" onclick="setCategory('${o.value}')">${label}</button>`;
+  }).join('');
 }
 function setSubcategoryFilter(sub){
   if(sub===currentSubcategoryFilter){
@@ -674,7 +790,9 @@ async function loadFromSheet(){
       localStorage.setItem(LS_SET,JSON.stringify(s));}
     if(Array.isArray(data.ads))ads=data.ads.map(a=>({id:a.id,date:normalizeDate(a.date),amount:a.amount,comment:a.comment||''})).reverse();
     if(Array.isArray(data.catalog))nameCatalog=data.catalog.map(c=>({id:c.id,subcategory:c.subcategory,name:c.name,img:c.img||''}));
-    persistLocal();persistAdsLocal();persistCatalogLocal();render();
+    serverHasCategories=Array.isArray(data.categories);
+    if(serverHasCategories)customCategories=data.categories.map(c=>({id:c.id,name:c.name}));
+    persistLocal();persistAdsLocal();persistCatalogLocal();persistCategoriesLocal();render();
     setSyncStatus('saved');
     return true;
   }catch(err){
@@ -883,7 +1001,7 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-buydate').value=todayISO();
   // новый товар сразу попадает в открытую сейчас категорию (как раньше, когда
   // была нажата одна из кнопок «Часы»/«Конструктор»)
-  document.getElementById('f-category').value=currentCategory;
+  rebuildCategoryOptions(currentCategory);
   document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
   document.getElementById('f-phone').value=formatPhone('');
@@ -900,7 +1018,7 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-create-qty-wrap').style.display='none';
   document.getElementById('f-img').value=p.img||'';
   document.getElementById('f-name').value=p.name||'';
-  document.getElementById('f-category').value=p.category||'';
+  rebuildCategoryOptions(p.category||'');
   rebuildSubcategoryOptions(p.subcategory||'');
   document.getElementById('f-shipmethod').value=p.shipMethod||'sea';
   document.getElementById('f-item').value=p.item||'';
@@ -967,11 +1085,32 @@ function catalogForSub(sub){
 // товара), т.к. это управление справочником, а не разовое действие при
 // добавлении одного товара.
 let editingCatalogId=null;
+// переключатель «Что создаём»: подкатегорию (с наполнением товарами-
+// шаблонами) или категорию — в одном и том же окне
+function setSubcatMode(mode){
+  const isCat=mode==='cat';
+  document.getElementById('subcat-mode').value=isCat?'cat':'sub';
+  document.getElementById('subcatModeCat').style.display=isCat?'block':'none';
+  document.getElementById('subcatModeSub').style.display=isCat?'none':'block';
+  // кнопки «Добавить товар в подкатегорию»/«Отменить изменение» относятся
+  // только к режиму подкатегории
+  document.getElementById('catalog-save-btn').style.display=isCat?'none':'';
+  if(isCat){
+    document.getElementById('catalog-cancel-edit-btn').style.display='none';
+    renderCatManage();
+    document.getElementById('cat-new-name').focus();
+  }else{
+    resetCatalogForm();
+    renderCatalogManage();
+  }
+}
 function openSubcatModal(){
   document.getElementById('subcat-new-name').value='';
+  document.getElementById('cat-new-name').value='';
   rebuildSubcatManageSelect();
   resetCatalogForm();
   renderCatalogManage();
+  setSubcatMode('sub');
   document.getElementById('subcatOverlay').classList.add('open');
 }
 function closeSubcatModal(){document.getElementById('subcatOverlay').classList.remove('open');}
@@ -1542,6 +1681,8 @@ function stockSectionLabel(key){
   if(key==='clock-other')return'🕒 Часы — другое';
   if(key==='constructor1')return'🧱 Конструктор';
   if(key==='none')return'Без категории';
+  const cc=customCategories.find(c=>c.id===key);
+  if(cc)return'📁 '+cc.name;
   const found=CLOCK_SUBCATEGORIES.find(s=>s.value===key);
   return found?found.label:('🏷️ '+key);
 }
@@ -1653,7 +1794,7 @@ function renderSubcatStats(){
   const section=document.getElementById('statsSubcatSection');
   // на вкладке «Конструктор» подкатегории (Harry Potter/Toothless) не
   // относятся к делу — раздел просто скрываем
-  if(currentCategory==='constructor1'){
+  if(currentCategory&&currentCategory!=='clock'){
     if(section)section.style.display='none';
     return;
   }
@@ -1782,7 +1923,7 @@ document.addEventListener('wheel',function(e){
 },{passive:true});
 
 renderCatTabs();
-loadSettings();loadItems();loadAds();loadCatalog();render();
+loadSettings();loadItems();loadAds();loadCatalog();loadCategories();render();
 loadFromSheet();
 </script>
 </body>

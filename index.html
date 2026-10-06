@@ -572,8 +572,13 @@ const BUILTIN_CATEGORIES=[
 ];
 function loadCategories(){customCategories=JSON.parse(localStorage.getItem(LS_CATEGORIES)||'[]');}
 function persistCategoriesLocal(){localStorage.setItem(LS_CATEGORIES,JSON.stringify(customCategories));}
+// если название уже начинается со своего эмодзи (например «🎀 Декор») —
+// не добавляем перед ним значок папки
+function customCatLabel(name){
+  return /^\p{Extended_Pictographic}/u.test(name)?name:'📁 '+name;
+}
 function allCategoryOptions(){
-  return BUILTIN_CATEGORIES.concat(customCategories.map(c=>({value:c.id,label:'📁 '+c.name,custom:true})));
+  return BUILTIN_CATEGORIES.concat(customCategories.map(c=>({value:c.id,label:customCatLabel(c.name),custom:true,name:c.name})));
 }
 function categoryLabel(key){
   const f=allCategoryOptions().find(o=>o.value===key);
@@ -592,7 +597,7 @@ function renderCatManage(){
   document.getElementById('catManageEmpty').style.display=customCategories.length?'none':'block';
   list.innerHTML=customCategories.map(c=>{
     const n=items.filter(p=>p.category===c.id).length;
-    return `<div class="cat-manage-row"><span>📁 ${escapeHtml(c.name)} <span style="color:var(--muted)">· товаров: ${n}</span></span>`
+    return `<div class="cat-manage-row"><span>${escapeHtml(customCatLabel(c.name))} <span style="color:var(--muted)">· товаров: ${n}</span></span>`
       +`<button class="btn btn-ghost btn-sm" title="${n?'Удалять можно только пустую категорию':'Удалить'}" ${n?'disabled':''} onclick="deleteCategory('${c.id}')">✕</button></div>`;
   }).join('');
 }
@@ -605,7 +610,7 @@ async function createCategory(){
     return;
   }
   const lower=name.toLowerCase();
-  const dup=allCategoryOptions().some(o=>o.value!==''&&o.label.replace(/^\S+\s/,'').toLowerCase()===lower);
+  const dup=allCategoryOptions().some(o=>o.value!==''&&(o.custom?o.name:o.label.replace(/^\S+\s/,'')).toLowerCase()===lower);
   if(dup){alert('Категория с таким названием уже есть.');return;}
   const rec={id:'ctg'+uid(),name};
   customCategories.push(rec);
@@ -1682,7 +1687,7 @@ function stockSectionLabel(key){
   if(key==='constructor1')return'🧱 Конструктор';
   if(key==='none')return'Без категории';
   const cc=customCategories.find(c=>c.id===key);
-  if(cc)return'📁 '+cc.name;
+  if(cc)return customCatLabel(cc.name);
   const found=CLOCK_SUBCATEGORIES.find(s=>s.value===key);
   return found?found.label:('🏷️ '+key);
 }

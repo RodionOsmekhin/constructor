@@ -418,8 +418,10 @@
         <div class="field">
           <label>Мессенджер</label>
           <select id="f-messenger">
+            <option value="" selected>— не выбран —</option>
             <option value="viber">Viber</option>
-            <option value="telegram" selected>Telegram</option>
+            <option value="telegram">Telegram</option>
+            <option value="olx">Олх</option>
           </select>
         </div>
       </div>
@@ -522,7 +524,14 @@
 
       <div class="field">
         <label>Управлять подкатегорией</label>
-        <select id="subcat-manage-select" onchange="onSubcatManageSelectChange()"></select>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="subcat-manage-select" style="flex:1;min-width:0" onchange="onSubcatManageSelectChange()"></select>
+          <button class="btn btn-ghost" id="subcat-delete-btn" style="white-space:nowrap" title="Удалить выбранную подкатегорию (только пустую)" onclick="deleteSubcategory()">🗑 Удалить</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>Показывать в категории</label>
+        <select id="subcat-bind-select" onchange="onSubcatBindChange()"></select>
       </div>
 
       <div class="stats-section-title" style="margin-top:6px">Товары в этой подкатегории</div>
@@ -576,6 +585,19 @@ function loadCategories(){
   catch(e){extraCategories=[];}
 }
 function persistCategoriesLocal(){localStorage.setItem(LS_CATEGORIES,JSON.stringify(extraCategories));}
+// пустая категория (ещё без товаров) тоже хранится в таблице — служебной
+// строкой на листе "catalog" (id вида "ctg:<название>"), чтобы не пропадала
+// при перезагрузке и была видна на других устройствах
+const CTG_PREFIX='ctg:';
+async function syncCategoryRecord(name,action){
+  setSyncStatus('saving');
+  try{
+    await apiPost(action==='delete'
+      ?{type:'catalog',action:'delete',id:CTG_PREFIX+name}
+      :{type:'catalog',action:'update',data:{id:CTG_PREFIX+name,subcategory:'',name:name,img:'@category'}});
+    setSyncStatus('saved');
+  }catch(err){setSyncStatus('error');console.error('Не удалось сохранить категорию:',err);}
+}
 function customCategories(){
   const names=new Set(extraCategories);
   items.forEach(p=>{if(p.category)names.add(p.category);});
@@ -622,6 +644,7 @@ function createCategory(){
   if(dup){alert('Категория с таким названием уже есть.');return;}
   extraCategories.push(name);
   persistCategoriesLocal();
+  syncCategoryRecord(name,'save');
   inp.value='';
   currentCategory=name;showSoldFirst=false;
   localStorage.setItem(LS_CATEGORY,name);
@@ -632,6 +655,7 @@ function deleteCategory(id){
   if(!confirm('Удалить категорию «'+id+'»?'))return;
   extraCategories=extraCategories.filter(n=>n!==id);
   persistCategoriesLocal();
+  syncCategoryRecord(id,'delete');
   if(currentCategory===id){currentCategory='';showSoldFirst=false;localStorage.setItem(LS_CATEGORY,'');}
   render();renderCatManage();
 }
@@ -658,9 +682,16 @@ function setCategory(cat){
     currentCategory=cat;
     localStorage.setItem(LS_CATEGORY,cat);
     showSoldFirst=false;
+    // фильтр подкатегории относится к конкретной категории — при переходе
+    // в другую сбрасываем, иначе список мог бы оказаться пустым
+    currentSubcategoryFilter='';
+    localStorage.setItem(LS_SUBCAT_FILTER,'');
   }
   render();
 }
+// подкатегории доступны у «Часы» и у своих категорий (например «🎀 Декор»);
+// у «Конструктор» и «Без категории» их нет
+function categoryUsesSubcategories(cat){return !!cat&&cat!=='constructor1';}
 function renderCatTabs(){
   // если выбранная категория уже не существует (удалена/не синхронизирована) —
   // возвращаемся на «Все»
@@ -674,7 +705,7 @@ function renderCatTabs(){
   }).join('');
 }
 function setSubcategoryFilter(sub){
-  if(sub===currentSubcategoryFilter){
+  if(sub===effectiveSubFilter()){
     showSoldFirst=!showSoldFirst;
   }else{
     currentSubcategoryFilter=sub;
@@ -685,25 +716,40 @@ function setSubcategoryFilter(sub){
 }
 // строка кнопок-фильтров по подкатегории — показывается только на вкладке
 // «Часы», и только если подкатегорий больше одной (иначе фильтровать нечего)
+// выбранный фильтр подкатегории действует, только если такая подкатегория
+// реально есть (с товарами) в открытой категории — иначе (например, остался
+// от другой категории после перезагрузки страницы) он игнорируется и список
+// не оказывается пустым
+function effectiveSubFilter(){
+  const f=currentSubcategoryFilter;
+  if(!f||!categoryUsesSubcategories(currentCategory))return'';
+  const inCat=items.filter(p=>p.category===currentCategory);
+  if(f==='clock-other')return inCat.some(p=>!p.subcategory)?f:'';
+  return inCat.some(p=>p.subcategory===f)?f:'';
+}
 function renderSubcatTabs(){
   const wrap=document.getElementById('subcatTabs');
-  if(currentCategory!=='clock'){wrap.style.display='none';return;}
-  const hasOther=items.some(p=>p.category==='clock'&&!p.subcategory);
-  const nonEmptySubs=CLOCK_SUBCATEGORIES.filter(s=>items.some(p=>p.category==='clock'&&p.subcategory===s.value));
+  if(!categoryUsesSubcategories(currentCategory)){wrap.style.display='none';return;}
+  const hasOther=items.some(p=>p.category===currentCategory&&!p.subcategory);
+  // вкладки — только у подкатегорий, где в этой категории есть товары
+  const nonEmptySubs=CLOCK_SUBCATEGORIES.filter(s=>items.some(p=>p.category===currentCategory&&p.subcategory===s.value));
   const opts=[{value:'',label:'Все'}].concat(nonEmptySubs.map(s=>({value:s.value,label:s.label})));
   if(hasOther)opts.push({value:'clock-other',label:'🕒 Другое'});
-  if(opts.length<=2){wrap.style.display='none';return;}
+  // вкладки показываем, даже если подкатегория с товарами всего одна;
+  // прячем, только когда подкатегорий с товарами нет совсем
+  if(!nonEmptySubs.length){wrap.style.display='none';return;}
   wrap.style.display='flex';
   wrap.innerHTML=opts.map(o=>{
-    const isActive=currentSubcategoryFilter===o.value;
-    const label=isActive&&showSoldFirst?o.label+' • ↑':o.label;
-    return `<button class="subcat-tab${isActive?' active':''}" onclick="setSubcategoryFilter('${o.value}')">${label}</button>`;
+    const isActive=effectiveSubFilter()===o.value;
+    const label=escapeHtml(isActive&&showSoldFirst?o.label+' • ↑':o.label);
+    return `<button class="subcat-tab${isActive?' active':''}" data-sub="${escapeHtml(o.value)}" onclick="setSubcategoryFilter(this.dataset.sub)">${label}</button>`;
   }).join('');
 }
 function visibleItems(){
   let list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
-  if(currentCategory==='clock'&&currentSubcategoryFilter){
-    list=list.filter(p=>(p.subcategory||'clock-other')===currentSubcategoryFilter);
+  const subF=effectiveSubFilter();
+  if(subF){
+    list=list.filter(p=>(p.subcategory||'clock-other')===subF);
   }
   // непроданные — сверху (порядок между собой не меняется), проданные —
   // снизу, но среди них самих сортируем по дате продажи: новые сверху.
@@ -775,7 +821,24 @@ async function loadFromSheet(){
       document.getElementById('s-uah').value=s.uah;
       localStorage.setItem(LS_SET,JSON.stringify(s));}
     if(Array.isArray(data.ads))ads=data.ads.map(a=>({id:a.id,date:normalizeDate(a.date),amount:a.amount,comment:a.comment||''})).reverse();
-    if(Array.isArray(data.catalog))nameCatalog=data.catalog.map(c=>({id:c.id,subcategory:c.subcategory,name:c.name,img:c.img||''}));
+    let boundInSheet=new Set();
+    if(Array.isArray(data.catalog)){
+      const isService=c=>String(c.id).startsWith(BIND_PREFIX)||String(c.id).startsWith(CTG_PREFIX);
+      const ctgInSheet=new Set(data.catalog.filter(c=>String(c.id).startsWith(CTG_PREFIX)&&c.name).map(c=>c.name));
+      ctgInSheet.forEach(n=>{if(!extraCategories.includes(n))extraCategories.push(n);});
+      // созданные раньше только в браузере — один раз отправляем в таблицу
+      extraCategories.filter(n=>!ctgInSheet.has(n)).forEach(n=>syncCategoryRecord(n,'save'));
+      persistCategoriesLocal();
+      nameCatalog=data.catalog.filter(c=>!isService(c))
+        .map(c=>({id:c.id,subcategory:c.subcategory,name:c.name,img:c.img||''}));
+      data.catalog.filter(c=>String(c.id).startsWith(BIND_PREFIX)&&c.subcategory&&c.img).forEach(c=>{
+        subBinding[c.subcategory]=c.img;boundInSheet.add(c.subcategory);
+      });
+      persistSubBinding();
+      // привязки, которые были сохранены только в браузере (до этого
+      // изменения), один раз отправляем в таблицу
+      Object.keys(subBinding).filter(sub=>!boundInSheet.has(sub)).forEach(sub=>saveSubBinding(sub,subBinding[sub]));
+    }
     persistLocal();persistAdsLocal();persistCatalogLocal();persistCategoriesLocal();render();
     setSyncStatus('saved');
     return true;
@@ -989,7 +1052,7 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
   document.getElementById('f-phone').value=formatPhone('');
-  document.getElementById('f-messenger').value='telegram';
+  document.getElementById('f-messenger').value='';
   document.getElementById('f-create-qty').value='1';
   // количество одинаковых копий имеет смысл только при создании нового
   // товара — у уже существующей карточки это поле скрываем
@@ -1013,7 +1076,7 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-saledate').value=p.saleDate||'';
   document.getElementById('f-comment').value=p.comment||'';
   document.getElementById('f-phone').value=formatPhone(p.phone||'');
-  document.getElementById('f-messenger').value=p.messenger||'telegram';
+  document.getElementById('f-messenger').value=p.messenger||'';
   updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -1024,16 +1087,78 @@ function closeModal(){document.getElementById('overlay').classList.remove('open'
 // (nameCatalog), поэтому список каждый раз довосстанавливается из того, что
 // реально используется (см. syncSubcategoriesFromItems) — отдельного
 // справочника для самого списка подкатегорий в таблице не нужно.
-let CLOCK_SUBCATEGORIES=[
-  {value:'hp',label:'⚡ Harry Potter'},
-  {value:'toothless',label:'🐉 Toothless'}
-];
+// Общий список подкатегорий. Встроенных больше нет: «Harry Potter» и
+// «Toothless» — такие же подкатегории, как и созданные вручную, их тоже можно
+// удалить. Список достраивается из товаров, шаблонов (лист "catalog") и
+// привязок (см. syncSubcategoriesFromItems), здесь хранятся только подписи.
+let CLOCK_SUBCATEGORIES=[];
+const KNOWN_SUB_LABELS={hp:'⚡ Harry Potter',toothless:'🐉 Toothless'};
+const SUB_PRIORITY=['hp','toothless'];
+function subLabel(v){return KNOWN_SUB_LABELS[v]||'🏷️ '+v;}
+// К какой категории относится подкатегория. Подкатегории — общий список, а
+// привязка к категории выводится из товаров (в какой категории они лежат) +
+// из явного выбора при создании (хранится в браузере, пока в подкатегории не
+// появится первый товар). Подкатегория без всякой привязки — старая, «Часы».
+const LS_SUBBIND='constructor_sub_bind';
+let subBinding={};
+function loadSubBinding(){
+  try{subBinding=JSON.parse(localStorage.getItem(LS_SUBBIND)||'{}')||{};}catch(e){subBinding={};}
+}
+function persistSubBinding(){localStorage.setItem(LS_SUBBIND,JSON.stringify(subBinding));}
+// Привязка подкатегории к категории хранится и в таблице — служебной строкой
+// на листе "catalog" (id вида "bind:<подкатегория>", в поле img — категория),
+// так что новый лист и передеплой скрипта не нужны, а привязка видна на всех
+// устройствах. В шаблоны товаров (nameCatalog) такие строки не попадают.
+const BIND_PREFIX='bind:';
+async function saveSubBinding(sub,cat){
+  subBinding[sub]=cat;
+  persistSubBinding();
+  setSyncStatus('saving');
+  try{
+    await apiPost({type:'catalog',action:'update',data:{id:BIND_PREFIX+sub,subcategory:sub,name:'@category',img:cat}});
+    setSyncStatus('saved');
+  }catch(err){
+    setSyncStatus('error');
+    console.error('Не удалось сохранить привязку подкатегории:',err);
+  }
+}
+function subCategoriesOf(sub){
+  const cats=new Set();
+  items.forEach(p=>{if(p.subcategory===sub&&p.category)cats.add(p.category);});
+  if(subBinding[sub])cats.add(subBinding[sub]);
+  if(!cats.size)cats.add('clock');
+  return cats;
+}
+// onlyUsed: для своих категорий показываем только подкатегории, у которых
+// есть товары в этой категории или которые явно к ней привязаны
+function subsForCategory(cat,onlyUsed){
+  return CLOCK_SUBCATEGORIES.filter(s=>{
+    if(!subCategoriesOf(s.value).has(cat))return false;
+    if(!onlyUsed)return true;
+    return subBinding[s.value]===cat||items.some(p=>p.category===cat&&p.subcategory===s.value);
+  });
+}
 function rebuildSubcategoryOptions(selectedValue){
   const sel=document.getElementById('f-subcategory');
   const cur=selectedValue!==undefined?selectedValue:sel.value;
+  const cat=document.getElementById('f-category').value;
+  let subs=categoryUsesSubcategories(cat)?subsForCategory(cat,cat!=='clock'):[];
+  // подкатегории, ни к какой категории ещё не привязанные и без товаров
+  // (например, созданные до появления привязки), в форме предлагаем и для
+  // своих категорий — чтобы не приходилось сначала искать, как их привязать
+  if(categoryUsesSubcategories(cat)&&cat!=='clock'){
+    CLOCK_SUBCATEGORIES.forEach(sc=>{
+      if(subs.some(x=>x.value===sc.value))return;
+      if(!subBinding[sc.value]&&!items.some(p=>p.subcategory===sc.value))subs.push(sc);
+    });
+  }
+  if(cur&&!subs.some(s=>s.value===cur)){
+    const f=CLOCK_SUBCATEGORIES.find(s=>s.value===cur);
+    if(f)subs=subs.concat([f]);
+  }
   sel.innerHTML='<option value="">— подкатегория —</option>'+
-    CLOCK_SUBCATEGORIES.map(s=>`<option value="${escapeHtml(s.value)}">${s.label}</option>`).join('');
-  sel.value=CLOCK_SUBCATEGORIES.some(s=>s.value===cur)?cur:'';
+    subs.map(s=>`<option value="${escapeHtml(s.value)}">${s.label}</option>`).join('');
+  sel.value=subs.some(s=>s.value===cur)?cur:'';
 }
 // подтягиваем подкатегории, которых ещё нет в списке, но которые уже
 // встречаются у товаров или в товарах-шаблонах (например, созданные/
@@ -1042,20 +1167,34 @@ function syncSubcategoriesFromItems(){
   const known=new Set(CLOCK_SUBCATEGORIES.map(s=>s.value));
   let added=false;
   items.forEach(p=>{
-    if(p.category==='clock'&&p.subcategory&&!known.has(p.subcategory)){
-      CLOCK_SUBCATEGORIES.push({value:p.subcategory,label:'🏷️ '+p.subcategory});
+    if(p.subcategory&&!known.has(p.subcategory)){
+      CLOCK_SUBCATEGORIES.push({value:p.subcategory,label:subLabel(p.subcategory)});
       known.add(p.subcategory);
       added=true;
     }
   });
   nameCatalog.forEach(c=>{
     if(c.subcategory&&!known.has(c.subcategory)){
-      CLOCK_SUBCATEGORIES.push({value:c.subcategory,label:'🏷️ '+c.subcategory});
+      CLOCK_SUBCATEGORIES.push({value:c.subcategory,label:subLabel(c.subcategory)});
       known.add(c.subcategory);
       added=true;
     }
   });
-  if(added)rebuildSubcategoryOptions();
+  // подкатегории, созданные вручную и привязанные к категории, но ещё без
+  // товаров, — иначе после перезагрузки страницы они бы пропадали из списка
+  Object.keys(subBinding).forEach(sub=>{
+    if(sub&&!known.has(sub)){
+      CLOCK_SUBCATEGORIES.push({value:sub,label:subLabel(sub)});
+      known.add(sub);
+      added=true;
+    }
+  });
+  if(added){
+    // hp и toothless — первыми, остальные в порядке появления
+    const rank=v=>{const i=SUB_PRIORITY.indexOf(v);return i<0?SUB_PRIORITY.length:i;};
+    CLOCK_SUBCATEGORIES=CLOCK_SUBCATEGORIES.map((x,i)=>({x,i})).sort((a,b)=>rank(a.x.value)-rank(b.x.value)||a.i-b.i).map(o=>o.x);
+    rebuildSubcategoryOptions();
+  }
 }
 rebuildSubcategoryOptions('');
 // список товаров-шаблонов (название+фото) для подкатегории — единственный
@@ -1084,9 +1223,67 @@ function setSubcatMode(mode){
     renderCatManage();
     document.getElementById('cat-new-name').focus();
   }else{
+    rebuildSubBindSelect();
     resetCatalogForm();
     renderCatalogManage();
   }
+}
+// категории, в которых вообще бывают подкатегории: «Часы» + свои
+function subCatCategoryChoices(){
+  return allCategoryOptions().filter(o=>categoryUsesSubcategories(o.value));
+}
+function rebuildSubBindSelect(){
+  const sub=document.getElementById('subcat-manage-select').value;
+  const sel=document.getElementById('subcat-bind-select');
+  const opts=subCatCategoryChoices();
+  sel.innerHTML=opts.map(o=>`<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('');
+  const cur=subBinding[sub]||[...subCategoriesOf(sub)][0];
+  sel.value=opts.some(o=>o.value===cur)?cur:'clock';
+}
+// удалить можно только подкатегорию, в которой нет товаров; её товары-
+// шаблоны (название+фото) удаляются вместе с ней
+async function deleteSubcategory(){
+  const sub=document.getElementById('subcat-manage-select').value;
+  if(!sub)return;
+  const n=items.filter(p=>p.subcategory===sub).length;
+  if(n){alert('В подкатегории есть товары ('+n+') — удалять можно только пустую подкатегорию.');return;}
+  const tpls=nameCatalog.filter(c=>c.subcategory===sub);
+  const label=(CLOCK_SUBCATEGORIES.find(s=>s.value===sub)||{label:sub}).label;
+  if(!confirm('Удалить подкатегорию «'+label+'»'+(tpls.length?' вместе с её товарами-шаблонами ('+tpls.length+')':'')+'?'))return;
+  CLOCK_SUBCATEGORIES=CLOCK_SUBCATEGORIES.filter(s=>s.value!==sub);
+  nameCatalog=nameCatalog.filter(c=>c.subcategory!==sub);
+  persistCatalogLocal();
+  const hadBind=sub in subBinding;
+  delete subBinding[sub];
+  persistSubBinding();
+  if(currentSubcategoryFilter===sub){currentSubcategoryFilter='';localStorage.setItem(LS_SUBCAT_FILTER,'');}
+  rebuildSubcategoryOptions();
+  rebuildSubcatManageSelect();
+  resetCatalogForm();
+  renderCatalogManage();
+  render();
+  setSyncStatus('saving');
+  const failed=[];
+  for(const c of tpls){
+    try{await apiPost({type:'catalog',action:'delete',id:c.id});}catch(err){failed.push(c);}
+  }
+  try{await apiPost({type:'catalog',action:'delete',id:BIND_PREFIX+sub});}catch(err){if(hadBind)failed.push({id:BIND_PREFIX+sub});}
+  if(failed.length){
+    // что не удалось удалить на сервере, вернётся при следующей загрузке —
+    // возвращаем на экран и шаблоны этой подкатегории
+    failed.filter(c=>c.subcategory).forEach(c=>nameCatalog.push(c));
+    persistCatalogLocal();render();
+    setSyncStatus('error');
+    alert('Не все данные подкатегории удалось удалить в таблице. Попробуйте ещё раз.');
+  }else{
+    setSyncStatus('saved');
+  }
+}
+function onSubcatBindChange(){
+  const sub=document.getElementById('subcat-manage-select').value;
+  if(!sub)return;
+  saveSubBinding(sub,document.getElementById('subcat-bind-select').value);
+  render();
 }
 function openSubcatModal(){
   document.getElementById('subcat-new-name').value='';
@@ -1103,10 +1300,12 @@ function rebuildSubcatManageSelect(selectedValue){
   const cur=selectedValue!==undefined?selectedValue:sel.value;
   sel.innerHTML=CLOCK_SUBCATEGORIES.map(s=>`<option value="${escapeHtml(s.value)}">${s.label}</option>`).join('');
   sel.value=CLOCK_SUBCATEGORIES.some(s=>s.value===cur)?cur:(CLOCK_SUBCATEGORIES[0]?CLOCK_SUBCATEGORIES[0].value:'');
+  rebuildSubBindSelect();
 }
 function onSubcatManageSelectChange(){
   // при переключении на другую подкатегорию редактирование (если было
   // начато) прерываем — список товаров теперь другой
+  rebuildSubBindSelect();
   resetCatalogForm();
   renderCatalogManage();
 }
@@ -1115,11 +1314,16 @@ function createSubcategoryFromModal(){
   const name=inp.value.trim();
   if(!name){inp.classList.add('invalid');inp.focus();return;}
   if(!CLOCK_SUBCATEGORIES.some(s=>s.value===name)){
-    CLOCK_SUBCATEGORIES.push({value:name,label:'🏷️ '+name});
+    CLOCK_SUBCATEGORIES.push({value:name,label:subLabel(name)});
   }
   inp.value='';
+  // новая подкатегория сразу привязывается к открытой сейчас категории (если
+  // у неё бывают подкатегории), иначе к «Часы»; изменить можно в поле
+  // «Показывать в категории» ниже
+  saveSubBinding(name,categoryUsesSubcategories(currentCategory)?currentCategory:'clock');
   rebuildSubcategoryOptions();
   rebuildSubcatManageSelect(name);
+  render();
   resetCatalogForm();
   renderCatalogManage();
   document.getElementById('catalog-name').focus();
@@ -1251,9 +1455,10 @@ document.getElementById('subcatOverlay').addEventListener('input',e=>e.target.cl
 // сужается до подкатегории (Harry Potter / Toothless / другое), и только
 // потом показывает названия именно этой подкатегории — без лишних вариантов.
 function updateNameSuggestions(){
+  rebuildSubcategoryOptions();
   const subSel=document.getElementById('f-subcategory');
   const sel=document.getElementById('f-name-select');
-  const isClock=document.getElementById('f-category').value==='clock';
+  const isClock=categoryUsesSubcategories(document.getElementById('f-category').value);
   subSel.style.display=isClock?'block':'none';
   if(!isClock){
     subSel.value='';
@@ -1533,7 +1738,7 @@ function exportContacts(){
   if(!rows.length){alert('Пока нет ни одного товара с указанным телефоном.');return;}
   const aoa=[['Название','Телефон','Мессенджер']];
   rows.forEach(p=>{
-    aoa.push([p.name||'',p.phone||'',p.messenger==='viber'?'Viber':'Telegram']);
+    aoa.push([p.name||'',p.phone||'',({viber:'Viber',telegram:'Telegram',olx:'Олх'}[p.messenger]||'')]);
   });
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:28},{wch:16},{wch:12}];
@@ -1668,7 +1873,7 @@ function stockSectionLabel(key){
   const cc=customCategories().find(c=>c.id===key);
   if(cc)return customCatLabel(cc.name);
   const found=CLOCK_SUBCATEGORIES.find(s=>s.value===key);
-  return found?found.label:('🏷️ '+key);
+  return found?found.label:subLabel(key);
 }
 function stockSectionOrder(usedKeys){
   const priority=['hp','toothless'];
@@ -1688,7 +1893,11 @@ function renderStock(){
   const groups={};
   list.forEach(p=>{
     const nameKey=groupKey(p.name);
-    const section=p.category==='clock'?(p.subcategory||'clock-other'):(p.category||'none');
+    // у «Часы» — по подкатегории (без неё — «другое»); у своих категорий
+    // с подкатегориями — по подкатегории, а товары без неё остаются в самой
+    // категории; у остальных — по категории
+    const section=p.category==='clock'?(p.subcategory||'clock-other')
+      :(categoryUsesSubcategories(p.category)&&p.subcategory?p.subcategory:(p.category||'none'));
     const key=section+'||'+nameKey;
     const qty=(p.qty!==undefined&&p.qty!==''&&!isNaN(parseInt(p.qty,10)))?parseInt(p.qty,10):1;
     if(!groups[key])groups[key]={name:nameKey,section:section,ids:[],qty:0,sold:0};
@@ -1776,9 +1985,11 @@ async function updateGroupQty(idsStr,value){
 
 function renderSubcatStats(){
   const section=document.getElementById('statsSubcatSection');
-  // на вкладке «Конструктор» подкатегории (Harry Potter/Toothless) не
-  // относятся к делу — раздел просто скрываем
-  if(currentCategory&&currentCategory!=='clock'){
+  // раздел показываем для «Все» (там считаются только «Часы», как раньше) и
+  // для категорий с подкатегориями («Часы», свои, например «🎀 Декор»);
+  // у «Конструктор» подкатегорий нет — раздел скрываем
+  const statsCat=currentCategory||'clock';
+  if(!categoryUsesSubcategories(statsCat)){
     if(section)section.style.display='none';
     return;
   }
@@ -1793,8 +2004,10 @@ function renderSubcatStats(){
   // подкатегории показываем всегда (даже с нулём товаров) — включая созданные
   // пользователем вручную, поэтому сеем группы из актуального списка
   // CLOCK_SUBCATEGORIES, а не из фиксированного набора hp/toothless
-  CLOCK_SUBCATEGORIES.forEach(s=>{groups[s.value]={key:s.value,total:0,sold:0,buy:0,sale:0,profit:0};});
-  items.filter(p=>p.category==='clock').forEach(p=>{
+  // у своих категорий засеваем только те подкатегории, что реально у них
+  // встречаются — общий список (hp/toothless/…) им не принадлежит
+  subsForCategory(statsCat,statsCat!=='clock').forEach(s=>{groups[s.value]={key:s.value,total:0,sold:0,buy:0,sale:0,profit:0};});
+  items.filter(p=>p.category===statsCat).forEach(p=>{
     const sub=p.subcategory||'clock-other';
     if(!groups[sub])groups[sub]={key:sub,total:0,sold:0,buy:0,sale:0,profit:0};
     const c=compute(p);
@@ -1816,7 +2029,8 @@ function renderSubcatStats(){
   tbody.innerHTML=rows.map(g=>{
     tBuy+=g.buy;tSale+=g.sale;tTotal+=g.total;tSold+=g.sold;
     const pc=g.profit>=0?'pos':'neg';
-    const label=stockSectionLabel(g.key);
+    const label=(g.key==='clock-other'&&statsCat!=='clock')
+      ?escapeHtml(customCatLabel(statsCat))+' — другое':stockSectionLabel(g.key);
     return`<tr><td>${label}</td><td>${g.total}</td><td>${g.sold}</td><td>${fmt(g.buy,' ₴')}</td><td>${fmt(g.sale,' ₴')}</td>
       <td class="${pc}">${fmt(g.profit,' ₴')}</td></tr>`;
   }).join('');
@@ -1906,8 +2120,7 @@ document.addEventListener('wheel',function(e){
   if(el && el.tagName==='INPUT' && el.type==='number'){el.blur();}
 },{passive:true});
 
-renderCatTabs();
-loadSettings();loadItems();loadAds();loadCatalog();loadCategories();render();
+loadSettings();loadItems();loadAds();loadCatalog();loadCategories();loadSubBinding();render();
 loadFromSheet();
 </script>
 </body>

@@ -58,6 +58,12 @@
   .card .thumb .noimg{position:absolute;inset:0;display:flex;align-items:center;
     justify-content:center;color:var(--muted);font-size:13px}
   .card.sold .thumb{filter:grayscale(.6);opacity:.6}
+  .title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+  .title-row h3{flex:1;min-width:0}
+  .pre-badge{flex-shrink:0;background:var(--gold);color:#1a1a1a;white-space:nowrap;
+    font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;letter-spacing:.5px;line-height:1.3}
+  .preorder-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:600}
+  .preorder-toggle input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
   .sold-badge{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;
     font-size:12px;font-weight:800;letter-spacing:.5px;padding:4px 10px;border-radius:6px;
     box-shadow:var(--shadow);z-index:2;transform:rotate(-6deg)}
@@ -169,6 +175,7 @@
   #statsSubcatBody td:nth-child(4),#statsSubcatFoot td:nth-child(4){color:var(--red)}
   #statsSubcatBody td:nth-child(5),#statsSubcatFoot td:nth-child(5){color:var(--green)}
   #stockBody td:nth-child(3){color:var(--gold)}
+  #stockBody td:nth-child(4){color:var(--accent)}
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
   .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
   .stats-chart-wrap canvas{max-height:220px}
@@ -209,6 +216,7 @@
     .card .thumb{aspect-ratio:auto;width:78px;height:78px;flex-shrink:0}
     .card .thumb .noimg{font-size:9px;padding:2px;text-align:center;line-height:1.2}
     .sold-badge{font-size:8px;padding:2px 5px;top:3px;left:3px;transform:rotate(-6deg) scale(.9)}
+    .pre-badge{font-size:8px;padding:1px 6px}
 
     .card .body{padding:8px 10px;gap:4px}
     .card h3{font-size:12.5px;line-height:1.25;font-weight:700;
@@ -266,7 +274,7 @@
 </header>
 
 <main class="wrap">
-  <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Расчетные данные ▾</button>
+  <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Данные▾</button>
   <div class="settings" id="settings">
     <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
       <button class="btn btn-primary" style="width:100%" onclick="openModal()">📦 Добавить товар</button>
@@ -309,6 +317,7 @@
       <thead><tr><th>Товар</th>
         <th class="sortable" onclick="setStockSort('qty')"><span class="th-label">Кол-во<span class="sort-arrow" id="sortArrow-qty"></span></span></th>
         <th class="sortable" onclick="setStockSort('sold')"><span class="th-label">Продано<span class="sort-arrow" id="sortArrow-sold"></span></span></th>
+        <th class="sortable" onclick="setStockSort('pre')"><span class="th-label">Предзаказ<span class="sort-arrow" id="sortArrow-pre"></span></span></th>
         <th class="sortable" onclick="setStockSort('remain')"><span class="th-label">Остаток<span class="sort-arrow" id="sortArrow-remain"></span></span></th>
       </tr></thead>
       <tbody id="stockBody"></tbody>
@@ -393,7 +402,7 @@
           <input id="f-weight" type="number" step="0.01" placeholder="0" oninput="recalc()">
         </div>
       <div class="field">
-        <label>Цена продажи в гривнах ₴ </label>
+        <label>Цена продажи в гривнах ₴ <span class="req pre-req" style="display:none">*</span></label>
         <input id="f-sale" type="number" step="1" placeholder="0" oninput="recalc()">
       </div>
       <div class="field">
@@ -410,18 +419,37 @@
           <input id="f-saledate" type="date">
         </div>
       </div>
+      <label class="preorder-toggle"><input id="f-preorder" type="checkbox" onchange="togglePreorder()"> Предзаказ</label>
+      <div id="preorder-fields" style="display:none">
+        <div class="field2">
+          <div class="field">
+            <label>Имя клиента <span class="req">*</span></label>
+            <input id="f-preorder-name" type="text" placeholder="Например: Иван">
+          </div>
+          <div class="field">
+            <label>Предоплата в гривнах ₴ <span class="req">*</span></label>
+            <input id="f-preorder-prepay" type="number" min="0" step="1" placeholder="0">
+          </div>
+        </div>
+        <div class="field" style="margin-top:14px">
+          <label>Дата предзаказа <span class="req">*</span></label>
+          <input id="f-preorder-date" type="date">
+        </div>
+        <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px">Для предзаказа также обязательны телефон, соцсеть и цена продажи. Имя, телефон, соцсеть, сумма, предоплата и дата предзаказа записываются в комментарий карточки.</div>
+      </div>
       <div class="field2">
         <div class="field">
-          <label>Телефон</label>
+          <label>Телефон <span class="req pre-req" style="display:none">*</span></label>
           <input id="f-phone" type="tel" placeholder="+38..." oninput="onPhoneInput(this)" onfocus="onPhoneInput(this)">
         </div>
         <div class="field">
-          <label>Мессенджер</label>
+          <label>Соцсеть <span class="req pre-req" style="display:none">*</span></label>
           <select id="f-messenger">
-            <option value="" selected>— не выбран —</option>
-            <option value="viber">Viber</option>
-            <option value="telegram">Telegram</option>
+            <option value="" selected>Не выбран</option>
             <option value="olx">Олх</option>
+            <option value="instagram">Instagram</option>
+            <option value="threads">Threads</option>
+            <option value="tiktok">TikTok</option>
           </select>
         </div>
       </div>
@@ -474,7 +502,8 @@
     </div>
     <div class="mfoot">
       <button class="btn btn-ghost" onclick="closeAdModal()">Закрыть</button>
-      <button class="btn btn-primary" onclick="saveAd()">Добавить</button>
+      <button class="btn btn-ghost" id="ad-cancel-edit" style="display:none" onclick="resetAdForm()">Отменить правку</button>
+      <button class="btn btn-primary" id="ad-save-btn" onclick="saveAd()">Добавить</button>
     </div>
   </div>
 </div>
@@ -646,7 +675,7 @@ function createCategory(){
   persistCategoriesLocal();
   syncCategoryRecord(name,'save');
   inp.value='';
-  currentCategory=name;showSoldFirst=false;
+  currentCategory=name;showSoldFirst=0;
   localStorage.setItem(LS_CATEGORY,name);
   render();renderCatManage();
 }
@@ -656,7 +685,7 @@ function deleteCategory(id){
   extraCategories=extraCategories.filter(n=>n!==id);
   persistCategoriesLocal();
   syncCategoryRecord(id,'delete');
-  if(currentCategory===id){currentCategory='';showSoldFirst=false;localStorage.setItem(LS_CATEGORY,'');}
+  if(currentCategory===id){currentCategory='';showSoldFirst=0;localStorage.setItem(LS_CATEGORY,'');}
   render();renderCatManage();
 }
 
@@ -672,16 +701,16 @@ let currentSubcategoryFilter=localStorage.getItem(LS_SUBCAT_FILTER)||'';
 // повторный клик на уже выбранную подкатегорию переключает порядок — сначала
 // проданные (самые новые продажи сверху), а не непроданные; ещё раз клик —
 // обратно к обычному порядку. Сбрасывается при выборе другой подкатегории.
-let showSoldFirst=false;
+let showSoldFirst=0; // 0 — обычный порядок, 1 — предзаказы наверх, 2 — проданные наверх
 function setCategory(cat){
   // повторный клик на уже активную категорию (как и с подкатегориями)
   // переключает порядок — проданные наверх и обратно
   if(cat===currentCategory){
-    showSoldFirst=!showSoldFirst;
+    showSoldFirst=nextSortMode();
   }else{
     currentCategory=cat;
     localStorage.setItem(LS_CATEGORY,cat);
-    showSoldFirst=false;
+    showSoldFirst=0;
     // фильтр подкатегории относится к конкретной категории — при переходе
     // в другую сбрасываем, иначе список мог бы оказаться пустым
     currentSubcategoryFilter='';
@@ -700,16 +729,16 @@ function renderCatTabs(){
   }
   document.getElementById('catTabs').innerHTML=allCategoryOptions().map(o=>{
     const isActive=o.value===currentCategory;
-    const label=escapeHtml(isActive&&showSoldFirst?o.label+' • ↑':o.label);
+    const label=escapeHtml(isActive&&showSoldFirst?o.label+(showSoldFirst===1?' • ⏳':' • ↑'):o.label);
     return `<button class="cat-tab${isActive?' active':''}" data-cat="${escapeHtml(o.value)}" onclick="setCategory(this.dataset.cat)">${label}</button>`;
   }).join('');
 }
 function setSubcategoryFilter(sub){
   if(sub===effectiveSubFilter()){
-    showSoldFirst=!showSoldFirst;
+    showSoldFirst=nextSortMode();
   }else{
     currentSubcategoryFilter=sub;
-    showSoldFirst=false;
+    showSoldFirst=0;
     localStorage.setItem(LS_SUBCAT_FILTER,sub);
   }
   render();
@@ -741,24 +770,41 @@ function renderSubcatTabs(){
   wrap.style.display='flex';
   wrap.innerHTML=opts.map(o=>{
     const isActive=effectiveSubFilter()===o.value;
-    const label=escapeHtml(isActive&&showSoldFirst?o.label+' • ↑':o.label);
+    const label=escapeHtml(isActive&&showSoldFirst?o.label+(showSoldFirst===1?' • ⏳':' • ↑'):o.label);
     return `<button class="subcat-tab${isActive?' active':''}" data-sub="${escapeHtml(o.value)}" onclick="setSubcategoryFilter(this.dataset.sub)">${label}</button>`;
   }).join('');
 }
-function visibleItems(){
+// следующий режим порядка по повторному клику: обычный → предзаказы наверх →
+// проданные наверх → обычный; если в текущем списке предзаказов нет —
+// первый клик сразу ведёт к проданным; если нет ни того ни другого — ничего не меняется
+function nextSortMode(){
+  const list=filteredItems();
+  const avail=[0];
+  if(list.some(p=>!p.saleDate&&parsePreorder(p.comment).pre))avail.push(1);
+  if(list.some(p=>p.saleDate))avail.push(2);
+  const i=avail.indexOf(showSoldFirst);
+  return avail[(i+1)%avail.length]; // i=-1 → 0; нет ни предзаказов, ни проданных — остаётся 0
+}
+function filteredItems(){
   let list=currentCategory?items.filter(p=>(p.category||'')===currentCategory):items;
   const subF=effectiveSubFilter();
   if(subF){
     list=list.filter(p=>(p.subcategory||'clock-other')===subF);
   }
-  // непроданные — сверху (порядок между собой не меняется), проданные —
+  return list;
+}
+function visibleItems(){
+  const list=filteredItems();
+  // непроданные — сверху (предзаказы после обычных), проданные —
   // снизу, но среди них самих сортируем по дате продажи: новые сверху.
   // Повторный клик на активную подкатегорию (showSoldFirst) переворачивает
   // эти две группы местами — проданные наверх.
   return [...list].sort((a,b)=>{
-    const as=!!a.saleDate, bs=!!b.saleDate;
-    if(as!==bs)return(as?1:-1)*(showSoldFirst?-1:1);
-    if(as&&bs)return (b.saleDate||'').localeCompare(a.saleDate||'');
+    // порядок: обычные → предзаказы (не проданные) → проданные
+    const rank=p=>p.saleDate?(showSoldFirst===2?-1:2):(parsePreorder(p.comment).pre?(showSoldFirst===1?-1:1):0);
+    const ra=rank(a), rb=rank(b);
+    if(ra!==rb)return ra-rb;
+    if(a.saleDate&&b.saleDate)return (b.saleDate||'').localeCompare(a.saleDate||'');
     return 0;
   });
 }
@@ -970,7 +1016,7 @@ function render(){
       <div class="thumb">${isSold?'<div class="sold-badge">ПРОДАНО</div>':''}${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
         <div class="noimg" style="display:${p.img?'none':'flex'}">нет фото</div></div>
       <div class="body">
-        <h3>${p.name||'Без названия'}</h3>
+        <div class="title-row"><h3>${p.name||'Без названия'}</h3>${parsePreorder(p.comment).pre?'<span class="pre-badge">ПРЕДЗАКАЗ</span>':''}</div>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
           <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка в ₴':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
@@ -1031,9 +1077,7 @@ function todayISO(){const d=new Date();const pad=n=>String(n).padStart(2,'0');
 // зафиксированные курсы, чтобы предпросмотр стоимости в самой форме тоже
 // показывал их, а не текущие (возможно, уже другие) курсы из настроек
 let editingItemRates=null;
-// поле "Телефон" всегда должно начинаться с "+38" — пользователь вводит
-// только то, что идёт после этого префикса, а сами цифры визуально
-// разбиваются дефисами по образцу 068-061-73-23
+
 function formatPhone(v){
   v=v||'';
   const rest=v.indexOf('+38')===0?v.slice(3):v;
@@ -1042,6 +1086,33 @@ function formatPhone(v){
   return '+38'+groups.join('-');
 }
 function onPhoneInput(el){el.value=formatPhone(el.value);}
+// --- Предзаказ ---------------------------------------------------------
+
+const SOCIAL_LABELS={olx:'Олх',instagram:'Instagram',threads:'Threads',tiktok:'TikTok',viber:'Viber',telegram:'Telegram'};
+const PREORDER_RE=/^\[Предзаказ\] Имя: (.*) \| Телефон: (.*) \| Соцсеть: (.*) \| Сумма: (\d+(?:\.\d+)?) ₴ \| Предоплата: (\d+(?:\.\d+)?) ₴ \| Дата (?:пред)?заказа: (\d{2})\.(\d{2})\.(\d{4})(?:\n([\s\S]*))?$/;
+// предыдущий формат — без даты заказа
+const PREORDER_RE_NODATE=/^\[Предзаказ\] Имя: (.*) \| Телефон: (.*) \| Соцсеть: (.*) \| Сумма: (\d+(?:\.\d+)?) ₴ \| Предоплата: (\d+(?:\.\d+)?) ₴(?:\n([\s\S]*))?$/;
+// прежний (более короткий) формат тоже читаем, чтобы уже созданные карточки не потерялись
+const PREORDER_RE_OLD=/^\[Предзаказ\] Имя: (.*) \| Предоплата: (\d+(?:\.\d+)?) ₴(?:\n([\s\S]*))?$/;
+function parsePreorder(comment){
+  const c=comment||'';
+  let m=PREORDER_RE.exec(c);
+  if(m)return{pre:true,name:m[1],prepay:m[5],date:m[8]+'-'+m[7]+'-'+m[6],rest:m[9]||''};
+  m=PREORDER_RE_NODATE.exec(c);
+  if(m)return{pre:true,name:m[1],prepay:m[5],date:'',rest:m[6]||''};
+  m=PREORDER_RE_OLD.exec(c);
+  if(m)return{pre:true,name:m[1],prepay:m[2],date:'',rest:m[3]||''};
+  return{pre:false,name:'',prepay:'',date:'',rest:c};
+}
+function buildPreorderComment(f){
+  return '[Предзаказ] Имя: '+f.name+' | Телефон: '+f.phone+' | Соцсеть: '+(SOCIAL_LABELS[f.social]||f.social)
+    +' | Сумма: '+f.sum+' ₴ | Предоплата: '+f.prepay+' ₴ | Дата предзаказа: '+fmtDate(f.date)+(f.rest?'\n'+f.rest:'');
+}
+function togglePreorder(){
+  const on=document.getElementById('f-preorder').checked;
+  document.getElementById('preorder-fields').style.display=on?'block':'none';
+  document.querySelectorAll('#overlay .pre-req').forEach(el=>el.style.display=on?'':'none');
+}
 function openModal(){editId=null;editingItemRates=null;document.getElementById('modal-title').textContent='Новый товар';
   ['f-img','f-name','f-item','f-weight','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment','f-phone'].forEach(i=>document.getElementById(i).value='');
   // дата покупки — обязательное поле, по умолчанию сегодняшняя дата
@@ -1052,7 +1123,13 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-subcategory').value='';
   document.getElementById('f-shipmethod').value='sea';
   document.getElementById('f-phone').value=formatPhone('');
+  document.querySelectorAll('#f-messenger option[data-legacy]').forEach(o=>o.remove());
   document.getElementById('f-messenger').value='';
+  document.getElementById('f-preorder').checked=false;
+  document.getElementById('f-preorder-name').value='';
+  document.getElementById('f-preorder-prepay').value='';
+  document.getElementById('f-preorder-date').value='';
+  togglePreorder();
   document.getElementById('f-create-qty').value='1';
   // количество одинаковых копий имеет смысл только при создании нового
   // товара — у уже существующей карточки это поле скрываем
@@ -1074,9 +1151,21 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-sale').value=p.sale||'';
   document.getElementById('f-buydate').value=p.buyDate||todayISO();
   document.getElementById('f-saledate').value=p.saleDate||'';
-  document.getElementById('f-comment').value=p.comment||'';
+  const pre=parsePreorder(p.comment);
+  document.getElementById('f-comment').value=pre.rest;
+  document.getElementById('f-preorder').checked=pre.pre;
+  document.getElementById('f-preorder-name').value=pre.name;
+  document.getElementById('f-preorder-prepay').value=pre.prepay;
+  document.getElementById('f-preorder-date').value=pre.date;
+  togglePreorder();
   document.getElementById('f-phone').value=formatPhone(p.phone||'');
-  document.getElementById('f-messenger').value=p.messenger||'';
+  // старые карточки могли иметь Viber/Telegram — на время редактирования
+  // добавляем такой вариант в список, чтобы значение не потерялось
+  const msgSel=document.getElementById('f-messenger');
+  if(p.messenger&&![...msgSel.options].some(o=>o.value===p.messenger)){
+    msgSel.insertAdjacentHTML('beforeend',`<option value="${escapeHtml(p.messenger)}" data-legacy="1">${escapeHtml(SOCIAL_LABELS[p.messenger]||p.messenger)}</option>`);
+  }
+  msgSel.value=p.messenger||'';
   updateNameSuggestions();
   updatePreview();recalc();document.getElementById('overlay').classList.add('open');}
 function closeModal(){document.getElementById('overlay').classList.remove('open');}
@@ -1548,6 +1637,20 @@ async function saveProduct(){
   const shipManualVal=document.getElementById('f-shipmanual').value;
   if(shipManualVal===''||isNaN(parseFloat(shipManualVal)))invalidIds.push('f-shipmanual');
   if(!document.getElementById('f-buydate').value)invalidIds.push('f-buydate');
+  // предзаказ: обязательны телефон (полностью), соцсеть, цена продажи,
+  // имя клиента, предоплата и дата предзаказа
+  const isPre=document.getElementById('f-preorder').checked;
+  if(isPre){
+    const phoneDigits=document.getElementById('f-phone').value.replace(/\D/g,'').replace(/^38/,'');
+    if(phoneDigits.length<10)invalidIds.push('f-phone');
+    if(!document.getElementById('f-messenger').value)invalidIds.push('f-messenger');
+    const saleV=document.getElementById('f-sale').value;
+    if(saleV===''||isNaN(parseFloat(saleV))||parseFloat(saleV)<=0)invalidIds.push('f-sale');
+    if(!document.getElementById('f-preorder-name').value.trim())invalidIds.push('f-preorder-name');
+    const prepV=document.getElementById('f-preorder-prepay').value;
+    if(prepV===''||isNaN(parseFloat(prepV))||parseFloat(prepV)<0)invalidIds.push('f-preorder-prepay');
+    if(!document.getElementById('f-preorder-date').value)invalidIds.push('f-preorder-date');
+  }
   if(invalidIds.length){
     invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
     document.getElementById(invalidIds[0]).scrollIntoView({behavior:'smooth',block:'center'});
@@ -1568,7 +1671,16 @@ async function saveProduct(){
     sale:document.getElementById('f-sale').value,
     buyDate:document.getElementById('f-buydate').value,
     saleDate:document.getElementById('f-saledate').value,
-    comment:document.getElementById('f-comment').value.trim(),
+    comment:isPre
+      ?buildPreorderComment({
+          name:document.getElementById('f-preorder-name').value.trim(),
+          phone:phoneRaw,
+          social:document.getElementById('f-messenger').value,
+          sum:String(parseFloat(document.getElementById('f-sale').value)),
+          prepay:String(parseFloat(document.getElementById('f-preorder-prepay').value)),
+          date:document.getElementById('f-preorder-date').value,
+          rest:document.getElementById('f-comment').value.trim()})
+      :document.getElementById('f-comment').value.trim(),
     phone:phoneRaw==='+38'?'':phoneRaw,
     messenger:document.getElementById('f-messenger').value};
   // курс юаня/доллара фиксируем ОДИН РАЗ — в момент создания товара —
@@ -1649,11 +1761,29 @@ async function delItem(id){
 }
 
 // --- расходы на рекламу ---
-function openAdModal(){
+let editingAdId=null;
+function resetAdForm(){
+  editingAdId=null;
   document.getElementById('ad-amount').value='';
   document.getElementById('ad-date').value=todayISO();
   document.getElementById('ad-comment').value='';
+  document.getElementById('ad-save-btn').textContent='Добавить';
+  document.getElementById('ad-cancel-edit').style.display='none';
   renderAdList();
+}
+function editAd(id){
+  const a=ads.find(x=>x.id===id);if(!a)return;
+  editingAdId=id;
+  document.getElementById('ad-amount').value=a.amount;
+  document.getElementById('ad-date').value=a.date||todayISO();
+  document.getElementById('ad-comment').value=a.comment||'';
+  document.getElementById('ad-save-btn').textContent='Сохранить';
+  document.getElementById('ad-cancel-edit').style.display='';
+  renderAdList();
+  document.getElementById('ad-amount').focus();
+}
+function openAdModal(){
+  resetAdForm();
   document.getElementById('adOverlay').classList.add('open');
 }
 function closeAdModal(){document.getElementById('adOverlay').classList.remove('open');}
@@ -1662,11 +1792,11 @@ function renderAdList(){
   if(!tbody)return;
   const sorted=[...ads].sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   document.getElementById('adListEmpty').style.display=sorted.length?'none':'block';
-  tbody.innerHTML=sorted.map(a=>`<tr>
+  tbody.innerHTML=sorted.map(a=>`<tr${a.id===editingAdId?' style="background:rgba(255,255,255,.07)"':''}>
     <td>${fmtDate(a.date)||'—'}</td>
     <td>${fmt(parseFloat(a.amount)||0,' ₴')}</td>
     <td>${a.comment?escapeHtml(a.comment):'—'}</td>
-    <td style="text-align:right"><button class="btn btn-ghost btn-sm" onclick="deleteAd('${a.id}')">✕</button></td>
+    <td style="text-align:right;white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="editAd('${a.id}')">✎</button> <button class="btn btn-ghost btn-sm" onclick="deleteAd('${a.id}')">✕</button></td>
   </tr>`).join('');
 }
 async function saveAd(){
@@ -1679,7 +1809,26 @@ async function saveAd(){
     invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
     return;
   }
-  const rec={id:'ad'+uid(),date:dateVal,amount:amountVal,comment:document.getElementById('ad-comment').value.trim()};
+  const comment=document.getElementById('ad-comment').value.trim();
+  if(editingAdId){
+    const idx=ads.findIndex(a=>a.id===editingAdId);
+    if(idx===-1){resetAdForm();return;}
+    const old=ads[idx], upd={id:old.id,date:dateVal,amount:amountVal,comment};
+    ads[idx]=upd;
+    persistAdsLocal();render();resetAdForm();
+    setSyncStatus('saving');
+    try{
+      await apiPost({type:'adspend',action:'update',data:upd});
+      setSyncStatus('saved');
+    }catch(err){
+      const i=ads.findIndex(a=>a.id===upd.id);if(i>-1)ads[i]=old;
+      persistAdsLocal();render();renderAdList();
+      setSyncStatus('error');
+      alert('Не удалось сохранить правку в таблице: '+err.message+'\nПопробуйте ещё раз.');
+    }
+    return;
+  }
+  const rec={id:'ad'+uid(),date:dateVal,amount:amountVal,comment};
   ads.unshift(rec);
   persistAdsLocal();render();renderAdList();
   document.getElementById('ad-amount').value='';
@@ -1730,15 +1879,15 @@ async function ensurePerm(h){
 function stamp(){const d=new Date(),p=n=>String(n).padStart(2,'0');
   return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}_${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;}
 
-// собирает телефон+мессенджер по всем товарам, у которых телефон указан,
+// собирает телефон+соцсеть по всем товарам, у которых телефон указан,
 // в настоящую Excel-таблицу (3 отдельные колонки) и скачивает её
 // (кнопка "📇 Импорт контактов")
 function exportContacts(){
   const rows=items.filter(p=>p.phone);
   if(!rows.length){alert('Пока нет ни одного товара с указанным телефоном.');return;}
-  const aoa=[['Название','Телефон','Мессенджер']];
+  const aoa=[['Название','Телефон','Соцсеть']];
   rows.forEach(p=>{
-    aoa.push([p.name||'',p.phone||'',({viber:'Viber',telegram:'Telegram',olx:'Олх'}[p.messenger]||'')]);
+    aoa.push([p.name||'',p.phone||'',(SOCIAL_LABELS[p.messenger]||'')]);
   });
   const ws=XLSX.utils.aoa_to_sheet(aoa);
   ws['!cols']=[{wch:28},{wch:16},{wch:12}];
@@ -1819,7 +1968,7 @@ async function syncBulkReplace(oldItems,newItems){
 
 function toggleSettings(){
   const s=document.getElementById('settings'), open=s.classList.toggle('open');
-  document.getElementById('settings-toggle').textContent='⚙ Расчетные данные '+(open?'▴':'▾');
+  document.getElementById('settings-toggle').textContent='⚙ Данные'+(open?'▴':'▾');
 }
 // панель «Расчётные данные» по умолчанию свёрнута и на десктопе, и на мобильном
 
@@ -1846,7 +1995,7 @@ function groupKey(name){
   const cleaned=(name||'').replace(/\s*[№#]\s*\d+\s*/g,' ').replace(/\s+/g,' ').trim();
   return cleaned||'Без названия';
 }
-// сортировка таблицы "Остатки" по клику на заголовок Кол-во/Продано/Остаток —
+// сортировка таблицы "Остатки" по клику на заголовок Кол-во/Продано/Предзаказ/Остаток —
 // повторный клик по тому же заголовку переключает направление (возрастание/убывание)
 let stockSort={col:null,dir:-1};
 function setStockSort(col){
@@ -1856,7 +2005,7 @@ function setStockSort(col){
   renderStock();
 }
 function updateStockSortArrows(){
-  ['qty','sold','remain'].forEach(col=>{
+  ['qty','sold','pre','remain'].forEach(col=>{
     const el=document.getElementById('sortArrow-'+col);
     if(!el)return;
     const active=stockSort.col===col;
@@ -1900,12 +2049,14 @@ function renderStock(){
       :(categoryUsesSubcategories(p.category)&&p.subcategory?p.subcategory:(p.category||'none'));
     const key=section+'||'+nameKey;
     const qty=(p.qty!==undefined&&p.qty!==''&&!isNaN(parseInt(p.qty,10)))?parseInt(p.qty,10):1;
-    if(!groups[key])groups[key]={name:nameKey,section:section,ids:[],qty:0,sold:0};
+    if(!groups[key])groups[key]={name:nameKey,section:section,ids:[],qty:0,sold:0,pre:0};
     groups[key].ids.push(p.id);
     groups[key].qty+=qty;
     if(p.saleDate)groups[key].sold++;
+    // предзаказ (ещё не проданный) резервирует товар — в остатке его уже нет
+    else if(parsePreorder(p.comment).pre)groups[key].pre++;
   });
-  const rows=Object.values(groups).map(g=>({...g,remain:Math.max(0,g.qty-g.sold)}));
+  const rows=Object.values(groups).map(g=>({...g,remain:Math.max(0,g.qty-g.sold-g.pre)}));
   const sortRows=arr=>{
     if(stockSort.col)arr.sort((a,b)=>(a[stockSort.col]-b[stockSort.col])*stockSort.dir);
     else arr.sort((a,b)=>a.name.localeCompare(b.name,'ru'));
@@ -1923,7 +2074,7 @@ function renderStock(){
     const arr=bySection[key];
     if(!arr||!arr.length)return;
     sortRows(arr);
-    html+=`<tr class="stock-group-row"><td colspan="4">${stockSectionLabel(key)}</td></tr>`;
+    html+=`<tr class="stock-group-row"><td colspan="5">${stockSectionLabel(key)}</td></tr>`;
     html+=arr.map(g=>{
       const remain=g.remain;
       return`<tr>
@@ -1931,6 +2082,7 @@ function renderStock(){
         <td><input class="qty-input" type="number" min="0" step="1" value="${g.qty}"
           onchange="updateGroupQty('${g.ids.join(',')}',this.value)"></td>
         <td>${g.sold}</td>
+        <td>${g.pre}</td>
         <td class="remain${remain===0?' zero':''}">${remain}</td>
       </tr>`;
     }).join('');
@@ -1939,8 +2091,8 @@ function renderStock(){
   const stockFoot=document.getElementById('stockFoot');
   if(stockFoot){
     const tQty=rows.reduce((s,g)=>s+g.qty,0), tSold=rows.reduce((s,g)=>s+g.sold,0),
-      tRemain=rows.reduce((s,g)=>s+g.remain,0);
-    stockFoot.innerHTML=rows.length?`<tr><td>Итого</td><td>${tQty}</td><td>${tSold}</td>
+      tPre=rows.reduce((s,g)=>s+g.pre,0), tRemain=rows.reduce((s,g)=>s+g.remain,0);
+    stockFoot.innerHTML=rows.length?`<tr><td>Итого</td><td>${tQty}</td><td>${tSold}</td><td>${tPre}</td>
       <td class="remain${tRemain===0?' zero':''}">${tRemain}</td></tr>`:'';
   }
 }

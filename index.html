@@ -63,7 +63,17 @@
   .pre-badge{flex-shrink:0;background:var(--gold);color:#1a1a1a;white-space:nowrap;
     font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;letter-spacing:.5px;line-height:1.3}
   .preorder-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:600}
-  .preorder-toggle input{width:18px;height:18px;accent-color:var(--accent);cursor:pointer}
+  .lbl-short{display:none}
+  .preorder-toggle{user-select:none;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;transition:border-color .15s,background .15s}
+  .preorder-toggle:hover{border-color:var(--accent)}
+  .preorder-toggle:has(input:checked){border-color:var(--gold);background:rgba(255,196,60,.08)}
+  .preorder-toggle input{appearance:none;-webkit-appearance:none;width:20px;height:20px;margin:0;flex-shrink:0;cursor:pointer;
+    background:var(--bg);border:2px solid var(--line);border-radius:6px;display:grid;place-content:center;transition:border-color .15s,background .15s}
+  .preorder-toggle input:hover{border-color:var(--accent)}
+  .preorder-toggle input::after{content:"";width:10px;height:5px;border-left:2.5px solid #1a1a1a;border-bottom:2.5px solid #1a1a1a;transform:rotate(-45deg) scale(0);margin-top:-2px;transition:transform .12s}
+  .preorder-toggle input:checked{background:var(--gold);border-color:var(--gold)}
+  .preorder-toggle input:checked::after{transform:rotate(-45deg) scale(1)}
+  .preorder-toggle input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
   .sold-badge{position:absolute;top:10px;left:10px;background:var(--red);color:#fff;
     font-size:12px;font-weight:800;letter-spacing:.5px;padding:4px 10px;border-radius:6px;
     box-shadow:var(--shadow);z-index:2;transform:rotate(-6deg)}
@@ -217,6 +227,8 @@
     .card .thumb .noimg{font-size:9px;padding:2px;text-align:center;line-height:1.2}
     .sold-badge{font-size:8px;padding:2px 5px;top:3px;left:3px;transform:rotate(-6deg) scale(.9)}
     .pre-badge{font-size:8px;padding:1px 6px}
+    .lbl-full{display:none}
+    .lbl-short{display:inline}
 
     .card .body{padding:8px 10px;gap:4px}
     .card h3{font-size:12.5px;line-height:1.25;font-weight:700;
@@ -317,7 +329,7 @@
       <thead><tr><th>Товар</th>
         <th class="sortable" onclick="setStockSort('qty')"><span class="th-label">Кол-во<span class="sort-arrow" id="sortArrow-qty"></span></span></th>
         <th class="sortable" onclick="setStockSort('sold')"><span class="th-label">Продано<span class="sort-arrow" id="sortArrow-sold"></span></span></th>
-        <th class="sortable" onclick="setStockSort('pre')"><span class="th-label">Предзаказ<span class="sort-arrow" id="sortArrow-pre"></span></span></th>
+        <th class="sortable" onclick="setStockSort('pre')"><span class="th-label"><span class="lbl-full">Предзаказ</span><span class="lbl-short">Пред-аз</span><span class="sort-arrow" id="sortArrow-pre"></span></span></th>
         <th class="sortable" onclick="setStockSort('remain')"><span class="th-label">Остаток<span class="sort-arrow" id="sortArrow-remain"></span></span></th>
       </tr></thead>
       <tbody id="stockBody"></tbody>
@@ -424,7 +436,7 @@
         <div class="field2">
           <div class="field">
             <label>Имя клиента <span class="req">*</span></label>
-            <input id="f-preorder-name" type="text" placeholder="Например: Иван">
+            <input id="f-preorder-name" type="text" placeholder="Имя">
           </div>
           <div class="field">
             <label>Предоплата в гривнах ₴ <span class="req">*</span></label>
@@ -435,7 +447,7 @@
           <label>Дата предзаказа <span class="req">*</span></label>
           <input id="f-preorder-date" type="date">
         </div>
-        <div class="hint" style="font-size:11px;color:var(--muted);margin-top:6px">Для предзаказа также обязательны телефон, соцсеть и цена продажи. Имя, телефон, соцсеть, сумма, предоплата и дата предзаказа записываются в комментарий карточки.</div>
+
       </div>
       <div class="field2">
         <div class="field">
@@ -445,7 +457,7 @@
         <div class="field">
           <label>Соцсеть <span class="req pre-req" style="display:none">*</span></label>
           <select id="f-messenger">
-            <option value="" selected>Не выбран</option>
+            <option value="" selected>Не выбрано</option>
             <option value="olx">Олх</option>
             <option value="instagram">Instagram</option>
             <option value="threads">Threads</option>

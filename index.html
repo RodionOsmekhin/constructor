@@ -188,7 +188,8 @@
   #stockBody td:nth-child(4){color:var(--accent)}
   .stats-empty{color:var(--muted);font-size:13px;text-align:center;padding:8px 0}
   .stats-chart-wrap{margin-top:16px;padding-top:14px;border-top:1px solid var(--line)}
-  .stats-chart-wrap canvas{max-height:220px}
+  .chart-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .chart-box{position:relative;height:220px;min-width:100%}
   .stats-section-title{margin-top:18px;padding-top:14px;border-top:1px solid var(--line);
     font-size:13px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px}
   .stock-table .qty-input{width:64px;display:block;margin:0 auto;text-align:center;background:var(--panel2);
@@ -321,7 +322,7 @@
     </table>
     <div class="stats-empty" id="statsEmpty" style="display:none">Пока нет данных по датам покупки/продажи</div>
     <div class="stats-chart-wrap">
-      <canvas id="chartMonthly" height="90"></canvas>
+      <div class="chart-scroll"><div class="chart-box" id="chartBox"><canvas id="chartMonthly"></canvas></div></div>
     </div>
 
     <div class="stats-section-title">Остатки</div>
@@ -2261,6 +2262,17 @@ function renderStats(){
   ];
   if(countAds)chartDatasets.push({label:'Реклама',data:adData,backgroundColor:'#ffbf47'});
   chartDatasets.push({label:'Прибыль',data:profitData,type:'line',borderColor:'#4f8cff',backgroundColor:'#4f8cff',tension:.3});
+  const isMobile=window.matchMedia('(max-width:600px)').matches;
+  // на телефоне: фиксированная высота и своя ширина на каждый месяц —
+  // при многих месяцах график прокручивается по горизонтали, а не сжимается
+  const box=document.getElementById('chartBox');
+  // высота невысокая, ширина подбирается по числу месяцев и столбцов:
+  // помещается — занимает всю ширину, нет — прокрутка, подписи не слипаются
+  const perMonth=countAds?78:62;
+  box.style.height=isMobile?'200px':'220px';
+  box.style.width=isMobile?(months.length*perMonth)+'px':'';
+  const fs=isMobile?10:12;
+  const shortNum=v=>Math.abs(v)>=1000?(Math.round(v/100)/10)+'k':v;
   statsChart=new Chart(ctx,{
     type:'bar',
     data:{
@@ -2269,10 +2281,11 @@ function renderStats(){
     },
     options:{
       responsive:true,
-      plugins:{legend:{labels:{color:'#e8eaf0'}}},
+      maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#e8eaf0',boxWidth:isMobile?10:40,font:{size:fs}}}},
       scales:{
-        x:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}},
-        y:{ticks:{color:'#8b93a7'},grid:{color:'#2a2f3a'}}
+        x:{ticks:{color:'#8b93a7',font:{size:fs},maxRotation:isMobile?0:50,autoSkip:!isMobile},grid:{color:'#2a2f3a'}},
+        y:{ticks:{color:'#8b93a7',font:{size:fs},callback:shortNum},grid:{color:'#2a2f3a'}}
       }
     }
   });

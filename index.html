@@ -64,6 +64,20 @@
     font-size:11px;font-weight:800;padding:3px 10px;border-radius:999px;letter-spacing:.5px;line-height:1.3}
   .preorder-toggle{display:flex;align-items:center;gap:10px;cursor:pointer;font-size:15px;font-weight:600}
   .lbl-short{display:none}
+  .pre-extra{margin-top:16px;padding:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px}
+  .pre-extra-title{font-size:13px;font-weight:700;margin-bottom:8px}
+  .pre-extra-title span{color:var(--gold)}
+  .pre-x-del{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:16px;padding:0 4px}
+  .pre-x-del:hover{color:var(--red)}
+  .pre-extra-list{display:flex;flex-direction:column;gap:10px}
+  .pre-extra .field{margin-top:0;margin-bottom:12px}
+  .pre-x-row{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:center;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}
+  .pre-x-row.on{border-color:var(--gold)}
+  .pre-x-row .nm{display:flex;gap:8px;align-items:center;font-size:13px;grid-column:1/3}
+  .pre-x-row .nm small{color:var(--muted)}
+  .pre-x-nums{display:none;grid-column:1/3;grid-template-columns:1fr 1fr;gap:14px}
+  .pre-x-row.on .pre-x-nums{display:grid}
+  .pre-extra-empty{font-size:12px;color:var(--muted);padding:6px}
   .preorder-toggle{user-select:none;padding:10px 12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;transition:border-color .15s,background .15s}
   .preorder-toggle:hover{border-color:var(--accent)}
   .preorder-toggle:has(input:checked){border-color:var(--gold);background:rgba(255,196,60,.08)}
@@ -287,7 +301,7 @@
 </header>
 
 <main class="wrap">
-  <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Данные▾</button>
+  <button class="btn btn-ghost settings-toggle" id="settings-toggle" onclick="toggleSettings()">⚙ Данные ▾</button>
   <div class="settings" id="settings">
     <div class="set-card" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
       <button class="btn btn-primary" style="width:100%" onclick="openModal()">📦 Добавить товар</button>
@@ -307,6 +321,9 @@
       </div>
     </div>
     <div class="set-card set-card-io" style="display:flex;flex-direction:column;justify-content:flex-end;gap:8px">
+      <!-- Временно скрыто: перенумерация предзаказов (функция numberOldPreorders в коде сохранена)
+      <button class="btn btn-ghost" style="width:100%" onclick="numberOldPreorders()">🔢 Пронумеровать предзаказы по порядку</button>
+      -->
       <button class="btn btn-ghost" style="width:100%" onclick="exportContacts()">📇 Импорт контактов</button>
       <button class="btn btn-ghost" style="width:100%" onclick="exportData()">⇩ Экспорт данных</button>
       <button class="btn btn-ghost" style="width:100%" onclick="document.getElementById('importFile').click()">⇧ Импорт данных</button>
@@ -448,7 +465,22 @@
           <label>Дата предзаказа <span class="req">*</span></label>
           <input id="f-preorder-date" type="date">
         </div>
-
+        <div class="pre-extra">
+          <div class="pre-extra-title">Добавить в этот предзаказ ещё товары <span id="pre-num-label"></span></div>
+          <div class="field">
+            <label>Категория</label>
+            <select id="pre-x-cat" onchange="document.getElementById('pre-x-sub').value='';renderPreExtra()"></select>
+          </div>
+          <div class="field" id="pre-x-sub-wrap">
+            <label>Подкатегория</label>
+            <select id="pre-x-sub" onchange="renderPreExtra()"></select>
+          </div>
+          <div class="field">
+            <label>Выбрать товар</label>
+            <select id="pre-x-item" onchange="addPreExtra(this.value)"></select>
+          </div>
+          <div id="pre-extra-list" class="pre-extra-list"></div>
+        </div>
       </div>
       <div class="field2">
         <div class="field">
@@ -817,8 +849,12 @@ function visibleItems(){
     const rank=p=>p.saleDate?(showSoldFirst===2?-1:2):(parsePreorder(p.comment).pre?(showSoldFirst===1?-1:1):0);
     const ra=rank(a), rb=rank(b);
     if(ra!==rb)return ra-rb;
-    if(a.saleDate&&b.saleDate)return (b.saleDate||'').localeCompare(a.saleDate||'');
-    return 0;
+    if(a.saleDate&&b.saleDate){
+      const d=(b.saleDate||'').localeCompare(a.saleDate||'');
+      if(d)return d;
+    }
+    // карточки одного предзаказа идут подряд, не разрываясь другими
+    return (parsePreorder(a.comment).num||0)-(parsePreorder(b.comment).num||0);
   });
 }
 
@@ -1029,7 +1065,7 @@ function render(){
       <div class="thumb">${isSold?'<div class="sold-badge">ПРОДАНО</div>':''}${p.img?`<img src="${p.img}" onerror="imgFallback(this,el=>{el.style.display='none';el.nextElementSibling.style.display='flex'})">`:''}
         <div class="noimg" style="display:${p.img?'none':'flex'}">нет фото</div></div>
       <div class="body">
-        <div class="title-row"><h3>${p.name||'Без названия'}</h3>${parsePreorder(p.comment).pre?'<span class="pre-badge">ПРЕДЗАКАЗ</span>':''}</div>
+        <div class="title-row"><h3>${p.name||'Без названия'}</h3>${(()=>{const pr=parsePreorder(p.comment);return pr.pre?'<span class="pre-badge">ПРЕДЗАКАЗ'+(pr.num?' №'+pr.num:'')+'</span>':'';})()}</div>
         <div class="rows">
           <div class="r"><span>Товар</span><b>${fmt(parseFloat(p.item)||0,' ¥')} · ${fmt(c.itemUAH,' ₴')}</b></div>
           <div class="r"><span>${p.shipManual!=null&&p.shipManual!==''?'Доставка в ₴':'Вес · доставка'} ${p.shipMethod==='air'?'✈️':'🚢'}</span><b>${p.shipManual!=null&&p.shipManual!==''?fmt(c.shipUAH,' ₴'):`${(parseFloat(p.weight)||0)} кг · ${fmt(c.shipUAH,' ₴')}`}</b></div>
@@ -1108,23 +1144,157 @@ const PREORDER_RE_NODATE=/^\[Предзаказ\] Имя: (.*) \| Телефон
 // прежний (более короткий) формат тоже читаем, чтобы уже созданные карточки не потерялись
 const PREORDER_RE_OLD=/^\[Предзаказ\] Имя: (.*) \| Предоплата: (\d+(?:\.\d+)?) ₴(?:\n([\s\S]*))?$/;
 function parsePreorder(comment){
-  const c=comment||'';
+  let c=comment||'';
+  // номер предзаказа: «[Предзаказ №3] …» — снимаем его и разбираем остальное как раньше
+  let num=0;
+  const nm=/^\[Предзаказ №(\d+)\]/.exec(c);
+  if(nm){num=parseInt(nm[1],10);c='[Предзаказ]'+c.slice(nm[0].length);}
+  const r=parsePreorderBody(c);
+  r.num=num;
+  return r;
+}
+function parsePreorderBody(c){
   let m=PREORDER_RE.exec(c);
-  if(m)return{pre:true,name:m[1],prepay:m[5],date:m[8]+'-'+m[7]+'-'+m[6],rest:m[9]||''};
+  if(m)return{pre:true,name:m[1],phone:m[2],social:m[3],sum:m[4],prepay:m[5],date:m[8]+'-'+m[7]+'-'+m[6],rest:m[9]||''};
   m=PREORDER_RE_NODATE.exec(c);
-  if(m)return{pre:true,name:m[1],prepay:m[5],date:'',rest:m[6]||''};
+  if(m)return{pre:true,name:m[1],phone:m[2],social:m[3],sum:m[4],prepay:m[5],date:'',rest:m[6]||''};
   m=PREORDER_RE_OLD.exec(c);
-  if(m)return{pre:true,name:m[1],prepay:m[2],date:'',rest:m[3]||''};
-  return{pre:false,name:'',prepay:'',date:'',rest:c};
+  if(m)return{pre:true,name:m[1],phone:'',social:'',sum:'',prepay:m[2],date:'',rest:m[3]||''};
+  return{pre:false,num:0,name:'',phone:'',social:'',sum:'',prepay:'',date:'',rest:c};
 }
 function buildPreorderComment(f){
-  return '[Предзаказ] Имя: '+f.name+' | Телефон: '+f.phone+' | Соцсеть: '+(SOCIAL_LABELS[f.social]||f.social)
+  return '[Предзаказ'+(f.num?' №'+f.num:'')+'] Имя: '+f.name+' | Телефон: '+f.phone+' | Соцсеть: '+(SOCIAL_LABELS[f.social]||f.social)
     +' | Сумма: '+f.sum+' ₴ | Предоплата: '+f.prepay+' ₴ | Дата предзаказа: '+fmtDate(f.date)+(f.rest?'\n'+f.rest:'');
+}
+// следующий номер предзаказа = максимальный существующий + 1
+function nextPreorderNum(){
+  return items.reduce((m,p)=>Math.max(m,parsePreorder(p.comment).num||0),0)+1;
+}
+// номер, который получит/имеет предзаказ в открытой форме
+let formPreNum=0;
+function currentFormPreNum(){
+  const ex=editId?items.find(x=>x.id===editId):null;
+  const n=ex?parsePreorder(ex.comment).num:0;
+  return n||nextPreorderNum();
+}
+// карточки, которые можно добавить в предзаказ: непроданные и без предзаказа.
+// Выбираются через три списка: категория → подкатегория → товар
+let preExtraSel={}; // id -> {sale,prepay}
+function renderPreExtra(){
+  const list=document.getElementById('pre-extra-list');if(!list)return;
+  // сохраняем уже введённые значения при перерисовке
+  list.querySelectorAll('.pre-x-row').forEach(r=>{
+    const id=r.dataset.id;if(!preExtraSel[id])return;
+    preExtraSel[id].sale=r.querySelector('.x-sale').value;
+    preExtraSel[id].prepay=r.querySelector('.x-prepay').value;
+  });
+  const catSel=document.getElementById('pre-x-cat'), subSel=document.getElementById('pre-x-sub'), itSel=document.getElementById('pre-x-item');
+  const cands=items.filter(p=>p.id!==editId&&!p.saleDate&&!parsePreorder(p.comment).pre&&!preExtraSel[p.id]);
+  // категория
+  const curCat=catSel.value;
+  const catKeys=[...new Set(cands.map(p=>p.category||'__none'))];
+  const catOpts=allCategoryOptions().filter(o=>o.value!==''&&catKeys.includes(o.value)).map(o=>({v:o.value,l:o.label}));
+  if(catKeys.includes('__none'))catOpts.push({v:'__none',l:'Без категории'});
+  catSel.innerHTML='<option value="">Все категории</option>'+catOpts.map(o=>`<option value="${escapeHtml(o.v)}">${escapeHtml(o.l)}</option>`).join('');
+  catSel.value=catOpts.some(o=>o.v===curCat)?curCat:'';
+  const inCat=cands.filter(p=>!catSel.value||(p.category||'__none')===catSel.value);
+  // подкатегория
+  const curSub=subSel.value;
+  const subKeys=[...new Set(inCat.map(p=>p.subcategory||''))].filter(k=>k!=='');
+  const hasNoSub=inCat.some(p=>!p.subcategory);
+  subSel.innerHTML='<option value="">Все подкатегории</option>'
+    +subKeys.map(k=>`<option value="${escapeHtml(k)}">${escapeHtml(subLabel(k))}</option>`).join('')
+    +((subKeys.length&&hasNoSub)?'<option value="__none">Без подкатегории</option>':'');
+  document.getElementById('pre-x-sub-wrap').style.display=subKeys.length?'':'none';
+  subSel.value=(curSub===''||subKeys.includes(curSub)||(curSub==='__none'&&hasNoSub&&subKeys.length))?curSub:'';
+  const inSub=inCat.filter(p=>!subSel.value||(subSel.value==='__none'?!p.subcategory:p.subcategory===subSel.value))
+    .sort((a,b)=>(a.name||'').localeCompare(b.name||'','ru'));
+  // товар
+  // одинаковые по названию карточки показываем одной позицией (со счётчиком):
+  // выбор берёт первую свободную из них
+  const byName={};
+  inSub.forEach(p=>{const k=p.name||'Без названия';(byName[k]=byName[k]||[]).push(p);});
+  itSel.innerHTML='<option value="">'+(inSub.length?'Выбрать товар…':'Нет подходящих товаров')+'</option>'
+    +Object.keys(byName).map(k=>`<option value="${byName[k][0].id}">${escapeHtml(k)}${byName[k].length>1?' (×'+byName[k].length+')':''}</option>`).join('');
+  itSel.value='';
+  // выбранные товары
+  list.innerHTML=Object.keys(preExtraSel).map(id=>{
+    const p=items.find(x=>x.id===id);if(!p)return'';
+    const sel=preExtraSel[id];
+    return `<div class="pre-x-row on" data-id="${id}">
+      <div class="nm"><span>${escapeHtml(p.name||'Без названия')} <small>${escapeHtml(catShortLabel(p.category))}</small></span>
+        <button type="button" class="pre-x-del" title="Убрать" onclick="removePreExtra('${id}')">✕</button></div>
+      <div class="pre-x-nums">
+        <div class="field" style="margin:0"><label>Цена продажи в гривнах ₴ <span class="req">*</span></label>
+          <input class="x-sale" type="number" min="0" step="1" placeholder="0" value="${escapeHtml(String(sel.sale))}"></div>
+        <div class="field" style="margin:0"><label>Предоплата в гривнах ₴ <span class="req">*</span></label>
+          <input class="x-prepay" type="number" min="0" step="1" placeholder="0" value="${escapeHtml(String(sel.prepay))}"></div>
+      </div></div>`;
+  }).join('');
+}
+function addPreExtra(id){
+  if(!id)return;
+  const p=items.find(x=>x.id===id);if(!p)return;
+  preExtraSel[id]={sale:p.sale||'',prepay:''};
+  renderPreExtra();
+}
+function removePreExtra(id){delete preExtraSel[id];renderPreExtra();}
+function catShortLabel(cat){
+  if(cat==='clock')return'Часы';
+  if(cat==='constructor1')return'Конструктор';
+  return cat||'Без категории';
+}
+// Перенумерация ВСЕХ предзаказов по порядку: самый ранний (по дате предзаказа)
+// получает №1, дальше по возрастанию даты. Карточки одного предзаказа (общий
+// номер, а у ещё не нумерованных — одинаковые имя+телефон+соцсеть+дата) остаются
+// под одним номером. При равных датах сохраняется прежний порядок номеров.
+async function numberOldPreorders(){
+  const pre=items.map((p,i)=>({p,i,r:parsePreorder(p.comment)})).filter(o=>o.r.pre);
+  if(!pre.length){alert('Предзаказов пока нет.');return;}
+  const groups=new Map();
+  pre.forEach(o=>{
+    const key=o.r.num?'n'+o.r.num:'k'+[o.r.name,o.r.phone,o.r.social,o.r.date].join('|').toLowerCase();
+    if(!groups.has(key))groups.set(key,{list:[],date:o.r.date||'9999-99-99',oldNum:o.r.num||1e9,idx:o.i});
+    const g=groups.get(key);
+    g.list.push(o);
+    if((o.r.date||'9999-99-99')<g.date)g.date=o.r.date;
+    g.idx=Math.max(g.idx,o.i); // items хранятся от новых к старым — больший индекс = старее
+  });
+  const ordered=[...groups.values()].sort((a,b)=>a.date.localeCompare(b.date)||a.oldNum-b.oldNum||b.idx-a.idx);
+  const plan=[];
+  ordered.forEach((g,gi)=>g.list.forEach(o=>{
+    const body=o.p.comment.replace(/^\[Предзаказ(?: №\d+)?\]/,'[Предзаказ №'+(gi+1)+']');
+    if(body!==o.p.comment)plan.push({id:o.p.id,body});
+  }));
+  if(!plan.length){alert('Нумерация уже в порядке: №1 — самый ранний предзаказ.');return;}
+  if(!confirm('Перенумеровать предзаказы по порядку (самый ранний — №1)? Предзаказов: '+ordered.length+', карточек к обновлению: '+plan.length+'.'))return;
+  const recs=plan.map(x=>{
+    const idx=items.findIndex(i=>i.id===x.id);
+    const prev={...items[idx]};
+    items[idx]={...prev,comment:x.body};
+    return{rec:items[idx],prev};
+  });
+  persistLocal();render();
+  setSyncStatus('saving');
+  const failed=[];
+  for(const r of recs){
+    try{await apiPost({type:'item',action:'update',data:r.rec});}
+    catch(err){failed.push({...r,err});}
+  }
+  if(failed.length){
+    failed.forEach(f=>{const i=items.findIndex(x=>x.id===f.rec.id);if(i>-1)items[i]=f.prev;});
+    persistLocal();render();setSyncStatus('error');
+    alert('Не удалось сохранить '+failed.length+' из '+recs.length+' карточек: '+failed[0].err.message+'\nПопробуйте ещё раз.');
+  }else setSyncStatus('saved');
 }
 function togglePreorder(){
   const on=document.getElementById('f-preorder').checked;
   document.getElementById('preorder-fields').style.display=on?'block':'none';
   document.querySelectorAll('#overlay .pre-req').forEach(el=>el.style.display=on?'':'none');
+  if(on){
+    document.getElementById('pre-num-label').textContent='(предзаказ №'+currentFormPreNum()+')';
+    renderPreExtra();
+  }
 }
 function openModal(){editId=null;editingItemRates=null;document.getElementById('modal-title').textContent='Новый товар';
   ['f-img','f-name','f-item','f-weight','f-shipmanual','f-sale','f-buydate','f-saledate','f-comment','f-phone'].forEach(i=>document.getElementById(i).value='');
@@ -1142,6 +1312,7 @@ function openModal(){editId=null;editingItemRates=null;document.getElementById('
   document.getElementById('f-preorder-name').value='';
   document.getElementById('f-preorder-prepay').value='';
   document.getElementById('f-preorder-date').value='';
+  preExtraSel={};['pre-x-cat','pre-x-sub'].forEach(i=>document.getElementById(i).value='');
   togglePreorder();
   document.getElementById('f-create-qty').value='1';
   // количество одинаковых копий имеет смысл только при создании нового
@@ -1170,6 +1341,7 @@ function editItem(id){const p=items.find(x=>x.id===id);if(!p)return;editId=id;
   document.getElementById('f-preorder-name').value=pre.name;
   document.getElementById('f-preorder-prepay').value=pre.prepay;
   document.getElementById('f-preorder-date').value=pre.date;
+  preExtraSel={};['pre-x-cat','pre-x-sub'].forEach(i=>document.getElementById(i).value='');
   togglePreorder();
   document.getElementById('f-phone').value=formatPhone(p.phone||'');
   // старые карточки могли иметь Viber/Telegram — на время редактирования
@@ -1664,6 +1836,23 @@ async function saveProduct(){
     if(prepV===''||isNaN(parseFloat(prepV))||parseFloat(prepV)<0)invalidIds.push('f-preorder-prepay');
     if(!document.getElementById('f-preorder-date').value)invalidIds.push('f-preorder-date');
   }
+  // выбранные дополнительные товары: цена продажи и предоплата обязательны
+  const extraBad=[];
+  if(isPre){
+    renderPreExtra(); // зафиксировать введённые значения
+    document.querySelectorAll('#pre-extra-list .pre-x-row.on').forEach(r=>{
+      const sEl=r.querySelector('.x-sale'), pEl=r.querySelector('.x-prepay');
+      preExtraSel[r.dataset.id]={sale:sEl.value,prepay:pEl.value};
+      if(sEl.value===''||isNaN(parseFloat(sEl.value))||parseFloat(sEl.value)<=0)extraBad.push(sEl);
+      if(pEl.value===''||isNaN(parseFloat(pEl.value))||parseFloat(pEl.value)<0)extraBad.push(pEl);
+    });
+  }
+  if(extraBad.length){
+    extraBad.forEach(el=>el.classList.add('invalid'));
+    extraBad[0].scrollIntoView({behavior:'smooth',block:'center'});
+    extraBad[0].focus();
+    return;
+  }
   if(invalidIds.length){
     invalidIds.forEach(id=>document.getElementById(id).classList.add('invalid'));
     document.getElementById(invalidIds[0]).scrollIntoView({behavior:'smooth',block:'center'});
@@ -1686,6 +1875,7 @@ async function saveProduct(){
     saleDate:document.getElementById('f-saledate').value,
     comment:isPre
       ?buildPreorderComment({
+          num:currentFormPreNum(),
           name:document.getElementById('f-preorder-name').value.trim(),
           phone:phoneRaw,
           social:document.getElementById('f-messenger').value,
@@ -1707,13 +1897,14 @@ async function saveProduct(){
     p.rateUah=s.uah;
   }
   const wasEditing=!!editId;
-  let prevIdx=-1, prevItem=null, recs;
+  // recs: [{rec, action, prev}] — prev нужен для отката при ошибке сохранения
+  let recs=[];
   if(wasEditing){
-    prevIdx=items.findIndex(x=>x.id===editId);
+    const prevIdx=items.findIndex(x=>x.id===editId);
     if(prevIdx===-1)return;
-    prevItem={...items[prevIdx]};
+    const prev={...items[prevIdx]};
     items[prevIdx]={...items[prevIdx],...p};
-    recs=[items[prevIdx]];
+    recs.push({rec:items[prevIdx],action:'update',prev});
   }else{
     // "Количество одинаковых товаров" — создаём несколько отдельных карточек
     // с одинаковыми данными одним сохранением, чтобы не заполнять форму
@@ -1721,31 +1912,58 @@ async function saveProduct(){
     // id, дальше её можно продать/отредактировать независимо от остальных.
     const qtyRaw=parseInt(document.getElementById('f-create-qty').value,10);
     const copies=(!isNaN(qtyRaw)&&qtyRaw>1)?qtyRaw:1;
-    recs=[];
     for(let i=0;i<copies;i++){
       const copy={...p,id:'p'+uid()};
       items.unshift(copy);
-      recs.push(copy);
+      recs.push({rec:copy,action:'add',prev:null});
+    }
+  }
+  if(isPre){
+    const base=parsePreorder(p.comment);
+    const shared={num:base.num,name:base.name,phone:phoneRaw,social:p.messenger,date:base.date};
+    const touched=new Set(recs.map(r=>r.rec.id));
+    // 1) выбранные в форме дополнительные товары — становятся частью этого предзаказа
+    Object.keys(preExtraSel).forEach(id=>{
+      const idx=items.findIndex(x=>x.id===id);if(idx===-1)return;
+      const prev={...items[idx]}, v=preExtraSel[id];
+      items[idx]={...prev,sale:String(parseFloat(v.sale)),phone:p.phone,messenger:p.messenger,
+        comment:buildPreorderComment({...shared,sum:String(parseFloat(v.sale)),prepay:String(parseFloat(v.prepay)),
+          rest:parsePreorder(prev.comment).rest})};
+      recs.push({rec:items[idx],action:'update',prev});touched.add(id);
+    });
+    // 2) остальные карточки того же предзаказа — автоматически получают
+    // новые имя/телефон/соцсеть/дату (цена и предоплата у каждой свои)
+    if(wasEditing&&base.num){
+      items.forEach((it,idx)=>{
+        if(touched.has(it.id))return;
+        const pr=parsePreorder(it.comment);
+        if(!pr.pre||pr.num!==base.num)return;
+        const nc=buildPreorderComment({...shared,sum:pr.sum,prepay:pr.prepay,rest:pr.rest});
+        if(nc===it.comment&&it.phone===p.phone&&it.messenger===p.messenger)return;
+        const prev={...it};
+        items[idx]={...it,comment:nc,phone:p.phone,messenger:p.messenger};
+        recs.push({rec:items[idx],action:'update',prev});
+      });
     }
   }
   // оптимистично показываем изменения сразу, не дожидаясь ответа сервера
   persistLocal();render();closeModal();
   setSyncStatus('saving');
   const failed=[];
-  for(const rec of recs){
+  for(const r of recs){
     try{
-      await apiPost({type:'item',action:wasEditing?'update':'add',data:rec});
+      await apiPost({type:'item',action:r.action,data:r.rec});
     }catch(err){
-      failed.push({rec,err});
+      failed.push({...r,err});
     }
   }
   if(failed.length){
-    // откатываем на экране только те копии, что не удалось сохранить на сервере
-    if(wasEditing){items[prevIdx]=prevItem;}
-    else{
-      const failedIds=new Set(failed.map(f=>f.rec.id));
-      items=items.filter(x=>!failedIds.has(x.id));
-    }
+    // откатываем на экране только то, что не удалось сохранить на сервере
+    failed.forEach(f=>{
+      const i=items.findIndex(x=>x.id===f.rec.id);
+      if(i===-1)return;
+      if(f.action==='add')items.splice(i,1);else items[i]=f.prev;
+    });
     persistLocal();render();
     setSyncStatus('error');
     alert('Не удалось сохранить '+failed.length+' из '+recs.length+' товар(ов) в таблице: '+failed[0].err.message+'\nПопробуйте ещё раз.');
